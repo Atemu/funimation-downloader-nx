@@ -23,7 +23,7 @@
 	"main": "funidl.js",
 	"dependencies": {
 		"request": "^2.53.0",
-		"socks5-https-client": "^1.2.1"
+		"socks5-https-client": "^1.2.1",
 		"sei-helper": "^1.1.0",
 		"yargs": "^3.18.0"
 	}
