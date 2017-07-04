@@ -45,6 +45,7 @@ After installing NodeJS with NPM goto `scripts` directory and type: `npm i`
 * `--alt` alternative episode listing (if available)
 * `-q <i>p` sets the video quality (optional, "720p" by default)
 * `--sub` switch from English dub to Japanese dub with subtitles
+* `--socks <s>` set ipv4 socks proxy for all requests to funimation api
 * `--proxy <s>` set ipv4 http(s) proxy for all requests to funimation api
 
 ### Muxing
