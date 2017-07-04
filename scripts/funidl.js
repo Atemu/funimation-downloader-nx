@@ -13,7 +13,8 @@ const fs = require('fs');
 // modules extra
 const shlp = require('sei-helper');
 const yargs = require('yargs');
-let request = require('request');
+const request = require('request');
+const agent = require('socks5-https-client/lib/Agent');
 
 // folders
 const configDir  = path.join(__dirname,'/config/');
@@ -77,6 +78,7 @@ let argv = yargs
 	.describe('pass','Your password')
 	
 	// proxy
+	.describe('socks','Set ipv4 socks5 proxy')
 	.describe('proxy','Set ipv4 http(s) proxy')
 	
 	// help
@@ -95,9 +97,15 @@ else{
 }
 
 // check proxy
-if(argv.proxy){
+if(argv.socks){
+	if(!shlp.validateIpAndPort(argv.socks)){
+		console.log('Error: not ipv4 socks5 proxy. Skipping...\n');
+		argv.socks = undefined;
+	}
+}
+else if(argv.proxy){
 	if(!shlp.validateIpAndPort(argv.proxy)){
-		console.log('Error: not ipv4 proxy. Skipping...\n');
+		console.log('Error: not ipv4 http(s) proxy. Skipping...\n');
 		argv.proxy = undefined;
 	}
 }
@@ -420,7 +428,16 @@ function getData(url,qs,proxy,useToken,auth){
 			Authorization: 'Token '+token
 		};
 	}
-	if(proxy && argv.proxy){
+	if(proxy && argv.socks){
+		options.agentClass = agent;
+		let agentOptions = {
+			socksHost: argv.socks.split(':')[0],
+			socksPort: argv.socks.split(':')[1]
+		};
+		options.agentOptions = agentOptions;
+		options.timeout = 10000;
+	}
+	else if(proxy && argv.proxy){
 		options.proxy = 'http://'+argv.proxy;
 		options.timeout = 10000;
 	}

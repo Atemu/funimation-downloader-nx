@@ -1,6 +1,6 @@
 {
 	"name": "funimation-downloader-nx",
-	"version": "2.3.3",
+	"version": "2.4.0",
 	"description": "Download videos from Funimation via cli.",
 	"keywords": [
 		"download",
@@ -23,6 +23,7 @@
 	"main": "funidl.js",
 	"dependencies": {
 		"request": "^2.53.0",
+		"socks5-https-client": "^1.2.1"
 		"sei-helper": "^1.1.0",
 		"yargs": "^3.18.0"
 	}
