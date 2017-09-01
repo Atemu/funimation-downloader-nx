@@ -4,6 +4,7 @@
 /bin/tsmuxer/*
 /scripts/node_modules/*
 funi_auth.json
+package-lock.json
 *.ts
 *.mkv
 *.mp4

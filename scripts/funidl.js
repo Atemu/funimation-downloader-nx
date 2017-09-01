@@ -4,6 +4,19 @@ const packageJson = require('./package.json');
 // program name
 console.log('\n=== Funimation Downloader NX '+packageJson.version+' ===\n');
 const api_host = 'https://prod-api-funimationnow.dadcdigital.com/api';
+const site_host = {
+	'AS': 'https://www.funimation.com',
+	'AU': 'https://www.funimation.com',
+	'CA': 'https://www.funimation.com',
+	'GB': 'https://www.funimationnow.uk',
+	'GU': 'https://www.funimation.com',
+	'IE': 'https://www.funimationnow.ie',
+	'MP': 'https://www.funimation.com',
+	'NZ': 'https://www.funimation.com',
+	'PR': 'https://www.funimation.com',
+	'US': 'https://www.funimation.com',
+	'VI': 'https://www.funimation.com'
+};
 
 // modules build-in
 const { chdir } = require('process');
@@ -140,13 +153,13 @@ async function auth(){
 	let authData;
 	try{
 		authData = await getData(api_host+'/auth/login/',false,true,false,true);
-		checkResp(authData);
+		checkResp(authData.body);
 	}
 	catch(error){
 		console.log(error,'\n');
 		process.exit(1);
 	}
-	authData = JSON.parse(authData);
+	authData = JSON.parse(authData.body);
 	if(authData.token){
 		console.log('[INFO] Authentication success, your token:',authData.token.slice(0,7)+'*'.repeat(33),'\n');
 		fs.writeFileSync(cfgFilename,JSON.stringify({"token":authData.token},null,'\t'));
@@ -162,14 +175,14 @@ async function searchShow(){
 	try{
 		let qs = {unique:true,limit:100,q:argv.search,offset:(argv.p-1)*1000};
 		searchData = await getData(api_host+'/source/funimation/search/auto/',qs,true,true);
-		checkResp(searchData);
+		checkResp(searchData.body);
 	}
 	catch(error){
 		console.log(error,'\n');
 		process.exit(1);
 	}
 	
-	searchData = JSON.parse(searchData);
+	searchData = JSON.parse(searchData.body);
 	if(searchData.items.hits){
 		let shows = searchData.items.hits;
 		console.log('[INFO] Search Results:');
@@ -185,14 +198,14 @@ async function getShow(){
 	let showData;
 	try{
 		showData = await getData(api_host+'/source/catalog/title/'+parseInt(argv.s,10),false,true,true);
-		checkResp(showData);
+		checkResp(showData.body);
 	}
 	catch(error){
 		console.log(error,'\n');
 		process.exit(1);
 	}
 	// check errors
-	showData = JSON.parse(showData);
+	showData = JSON.parse(showData.body);
 	if(showData.status){
 		console.log('[ERROR] Error #'+showData.status+':',showData.data.errors[0].detail,'\n');
 		process.exit(1);
@@ -208,14 +221,14 @@ async function getShow(){
 		let qs = {limit:-1,sort:'order',sort_direction:'ASC',title_id:parseInt(argv.s,10)};
 		if(argv.alt){ qs.language = 'English'; }
 		episodesData = await getData(api_host+'/funimation/episodes/',qs,true,true);
-		checkResp(episodesData);
+		checkResp(episodesData.body);
 	}
 	catch(error){
 		console.log(error,'\n');
 		process.exit(1);
 	}
 	// parse episodes list
-	let eps = JSON.parse(episodesData).items,
+	let eps = JSON.parse(episodesData.body).items,
 		fnSlug = false;
 	for(let e in eps){
 		let showStrId = eps[e].ids.externalShowId;
@@ -247,13 +260,13 @@ async function getShow(){
 	let episodeData;
 	try{
 		episodeData = await getData(api_host+'/source/catalog/episode/'+fnSlug.title+'/'+fnSlug.episode+'/',false,true,true);
-		checkResp(episodeData);
+		checkResp(episodeData.body);
 	}
 	catch(error){
 		console.log(error,'\n');
 		process.exit(1);
 	}
-	let ep = JSON.parse(episodeData).items[0], streamId = 0;
+	let ep = JSON.parse(episodeData.body).items[0], streamId = 0;
 	// build fn
 	fnTitle = argv.t ? argv.t : ep.parent.title;
 	ep.number = isNaN(ep.number) ? ep.number : ( parseInt(ep.number, 10) < 10 ? '0' + ep.number : ep.number );
@@ -288,16 +301,21 @@ async function getShow(){
 		process.exit();
 	}
 	// get stream url
-	let streamData;
+	let streamData, regionData;
 	try{
-		streamData = await getData(api_host+'/source/catalog/video/'+streamId+'/signed',false,true,true);
-		checkResp(streamData);
+		// streamData = await getData(api_host+'/source/catalog/video/'+streamId+'/signed',false,true,true);
+		// streamData = await getData(site_host[regionData]+/api/showexperience/'+streamId+'/',{"pinst_id":genPinstId()},true,true);
+		regionData = await getData(api_host+'/source/funimation/region/check/',false,true);
+		checkResp(regionData.body);
+		regionData = JSON.parse(regionData.body).region;
+		streamData = await getData(site_host[regionData]+'/api/showexperience/'+streamId+'/',{"pinst_id":genPinstId()},true,true);
+		checkResp(streamData.body);
 	}
 	catch(error){
 		console.log(error,'\n');
 		process.exit(1);
 	}
-	streamData = JSON.parse(streamData);
+	streamData = JSON.parse(streamData.body);
 	if(streamData.errors){
 		console.log('\n[ERROR] Error #'+streamData.errors[0].code+':',streamData.errors[0].detail,'\n');
 		process.exit(1);
@@ -315,6 +333,15 @@ async function getShow(){
 		process.exit(1);
 	}
 	downloadStreams();
+}
+
+const chars = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
+function genPinstId(){
+	let pinstId = '';
+	for(let i=0; i<8; i++) {
+		pinstId += chars[Math.floor(Math.random()*chars.length)];
+	}
+	return pinstId;
 }
 
 function getSubsUrl(m){
@@ -340,7 +367,7 @@ async function downloadStreams(){
 	if(stDlPath){
 		console.log('\n[INFO] Downloading subtitles...');
 		let subsSrc = await getData(stDlPath);
-		fs.writeFileSync(fnOutput+'.vtt',subsSrc);
+		fs.writeFileSync(fnOutput+'.vtt',subsSrc.body);
 		console.log('[INFO] Downloaded!');
 	}
 	// select muxer
@@ -424,9 +451,16 @@ function getData(url,qs,proxy,useToken,auth){
 		};
 	}
 	if(useToken && token){
-		options.headers = {
-			Authorization: 'Token '+token
-		};
+		if(options.qs && options.qs.pinst_id){
+			options.headers = {
+				Cookie: 'src_token='+token
+			};
+		}
+		else{
+			options.headers = {
+				Authorization: 'Token '+token
+			};
+		}
 	}
 	if(proxy && argv.socks){
 		options.agentClass = agent;
@@ -443,12 +477,12 @@ function getData(url,qs,proxy,useToken,auth){
 	}
 	// do request
 	return new Promise((resolve, reject) => {
-		request(options, (err, resp, body) => {
+		request(options, (err, resp) => {
 			if (err) return reject(err);
 			if (resp.statusCode != 200 && resp.statusCode != 403) {
 				return reject(new Error(`\nStatus: ${resp.statusCode}`));
 			}
-			resolve(body);
+			resolve(resp);
 		});
 	});
 }
