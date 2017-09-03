@@ -4,19 +4,6 @@ const packageJson = require('./package.json');
 // program name
 console.log('\n=== Funimation Downloader NX '+packageJson.version+' ===\n');
 const api_host = 'https://prod-api-funimationnow.dadcdigital.com/api';
-const site_host = {
-	'AS': 'https://www.funimation.com',
-	'AU': 'https://www.funimation.com',
-	'CA': 'https://www.funimation.com',
-	'GB': 'https://www.funimationnow.uk',
-	'GU': 'https://www.funimation.com',
-	'IE': 'https://www.funimationnow.ie',
-	'MP': 'https://www.funimation.com',
-	'NZ': 'https://www.funimation.com',
-	'PR': 'https://www.funimation.com',
-	'US': 'https://www.funimation.com',
-	'VI': 'https://www.funimation.com'
-};
 
 // modules build-in
 const { chdir } = require('process');
@@ -80,6 +67,9 @@ let argv = yargs
 	.describe('ep','Filename: episode number override')
 	.describe('suffix','Filename: filename suffix override (first "SIZEp" will be raplaced with actual video size)')
 	.default('suffix','SIZEp')
+	
+	.describe('nosubs','skip download subtitles for Dub (if available)')
+	.boolean('nosubs')
 	
 	.describe('mkv','Mux into mkv')
 	.boolean('mkv')
@@ -301,14 +291,9 @@ async function getShow(){
 		process.exit();
 	}
 	// get stream url
-	let streamData, regionData;
+	let streamData;
 	try{
-		// streamData = await getData(api_host+'/source/catalog/video/'+streamId+'/signed',false,true,true);
-		// streamData = await getData(site_host[regionData]+/api/showexperience/'+streamId+'/',{"pinst_id":genPinstId()},true,true);
-		regionData = await getData(api_host+'/source/funimation/region/check/',false,true);
-		checkResp(regionData.body);
-		regionData = JSON.parse(regionData.body).region;
-		streamData = await getData(site_host[regionData]+'/api/showexperience/'+streamId+'/',{"pinst_id":genPinstId()},true,true);
+		streamData = await getData(api_host+'/source/catalog/video/'+streamId+'/signed',{"dinstid":"uuid"},true,true);
 		checkResp(streamData.body);
 	}
 	catch(error){
@@ -335,16 +320,10 @@ async function getShow(){
 	downloadStreams();
 }
 
-const chars = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
-function genPinstId(){
-	let pinstId = '';
-	for(let i=0; i<8; i++) {
-		pinstId += chars[Math.floor(Math.random()*chars.length)];
-	}
-	return pinstId;
-}
-
 function getSubsUrl(m){
+	if(argv.nosubs && !argv.sub){
+		return false;
+	}
 	for(let i in m){
 		let fpp = m[i].filePath.split('.');
 		let fpe = fpp[fpp.length-1];
@@ -376,7 +355,7 @@ async function downloadStreams(){
 		let mkvmux  = '-o "'+fnOutput+'.mkv" --disable-track-statistics-tags --engage no_variable_data ';
 			mkvmux += '--track-name "0:['+argv.a+']" --language "1:'+(argv.sub?'jpn':'eng')+'" --video-tracks 0 --audio-tracks 1 --no-subtitles --no-attachments ';
 			mkvmux += '"'+fnOutput+'.ts" ';
-			if(argv.mks&&stDlPath){
+			if(argv.mks && stDlPath){
 				mkvmux += '--language 0:eng "'+fnOutput+'.vtt" ';
 			}
 		shlp.exec('mkvmerge','"'+path.normalize(bin.mkvmerge)+'"',mkvmux,true);
@@ -451,15 +430,12 @@ function getData(url,qs,proxy,useToken,auth){
 		};
 	}
 	if(useToken && token){
-		if(options.qs && options.qs.pinst_id){
-			options.headers = {
-				Cookie: 'src_token='+token
-			};
-		}
-		else{
-			options.headers = {
-				Authorization: 'Token '+token
-			};
+		options.headers = {
+			Authorization: 'Token '+token
+		};
+		if(options.qs && options.qs.dinstid){
+			options.headers.devicetype = 'Android Phone';
+			delete options.qs;
 		}
 	}
 	if(proxy && argv.socks){

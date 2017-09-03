@@ -47,6 +47,7 @@ After installing NodeJS with NPM goto `scripts` directory and type: `npm i`
 * `--sub` switch from English dub to Japanese dub with subtitles
 * `--socks <s>` set ipv4 socks proxy for all requests to funimation api
 * `--proxy <s>` set ipv4 http(s) proxy for all requests to funimation api
+* `--nosubs` skip download subtitles for Dub (if available)
 
 ### Muxing
 
