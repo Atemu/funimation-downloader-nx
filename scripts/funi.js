@@ -6,7 +6,6 @@ console.log('\n=== Funimation Downloader NX '+packageJson.version+' ===\n');
 const api_host = 'https://prod-api-funimationnow.dadcdigital.com/api';
 
 // modules build-in
-const { chdir } = require('process');
 const path = require('path');
 const fs = require('fs');
 
@@ -15,6 +14,11 @@ const shlp = require('sei-helper');
 const yargs = require('yargs');
 const request = require('request');
 const agent = require('socks5-https-client/lib/Agent');
+
+// m3u8
+const m3u8list = require('m3u8-stream-list');
+const m3u8 = require('m3u8-parser');
+const streamdl = require('./module.hls-download');
 
 // folders
 const configDir  = path.join(__dirname,'/config/');
@@ -57,9 +61,13 @@ let argv = yargs
 	.describe('sub','Subtitles mode (Dub mode by default)')
 	.boolean('sub')
 	
-	.describe('q','Video quality')
-	.choices('q', ['234p','270p','288p','360p','480p','540p','720p','1080p'])
-	.default('q','720p')
+	//.describe('q','Video quality')
+	//.choices('q', ['234p','270p','288p','360p','480p','540p','720p','1080p'])
+	//.default('q','720p')
+	
+	.describe('q','Video layer (0=max)')
+	.choices('q', [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+	.default('q', 7)
 	
 	.describe('a','Release group')
 	.default('a','Funimation')
@@ -83,6 +91,8 @@ let argv = yargs
 	// proxy
 	.describe('socks','Set ipv4 socks5 proxy')
 	.describe('proxy','Set ipv4 http(s) proxy')
+	.describe('ssp','Don\'t use proxy for stream downloading')
+	.boolean('ssp')
 	
 	// help
 	.describe('h','Show this help')
@@ -120,36 +130,29 @@ let fnTitle = '',
 	fnOutput = '',
 	fnOutput_bak = '',
 	tsDlPath = false,
-	stDlPath = false;
+	stDlPath = false,
+	batchDL = false;
 
 // select mode
+process.chdir(workDir.content);
 if(argv.mail && argv.pass){
 	auth();
 }
-else if(argv.search || argv.s && !isNaN(parseInt(argv.s,10)) && parseInt(argv.s,10) > 0){
-	if(argv.search){
-		searchShow();
-	}
-	else{
-		getShow();
-	}
+else if(argv.search){
+	searchShow();
+}
+else if(argv.s && !isNaN(parseInt(argv.s,10)) && parseInt(argv.s,10) > 0){
+	getShow();
 }
 else{
-	console.log(yargs.help());
+	console.log(yargs.showHelp());
 	process.exit();
 }
 
 async function auth(){
-	let authData;
-	try{
-		authData = await getData(api_host+'/auth/login/',false,true,false,true);
-		checkResp(authData.body);
-	}
-	catch(error){
-		console.log(error,'\n');
-		process.exit(1);
-	}
-	authData = JSON.parse(authData.body);
+	let authData = await getData(api_host+'/auth/login/',false,true,false,true);
+	if(checkRes(authData)){return;}
+	authData = JSON.parse(authData.res.body);
 	if(authData.token){
 		console.log('[INFO] Authentication success, your token:',authData.token.slice(0,7)+'*'.repeat(33),'\n');
 		fs.writeFileSync(cfgFilename,JSON.stringify({"token":authData.token},null,'\t'));
@@ -161,18 +164,10 @@ async function auth(){
 }
 
 async function searchShow(){
-	let searchData;
-	try{
-		let qs = {unique:true,limit:100,q:argv.search,offset:(argv.p-1)*1000};
-		searchData = await getData(api_host+'/source/funimation/search/auto/',qs,true,true);
-		checkResp(searchData.body);
-	}
-	catch(error){
-		console.log(error,'\n');
-		process.exit(1);
-	}
-	
-	searchData = JSON.parse(searchData.body);
+	let qs = {unique:true,limit:100,q:argv.search,offset:(argv.p-1)*1000};
+	let searchData = await getData(api_host+'/source/funimation/search/auto/',qs,true,true);
+	if(checkRes(searchData)){return;}
+	searchData = JSON.parse(searchData.res.body);
 	if(searchData.items.hits){
 		let shows = searchData.items.hits;
 		console.log('[INFO] Search Results:');
@@ -183,19 +178,13 @@ async function searchShow(){
 	console.log('[INFO] Total shows found:',searchData.count,'\n');
 }
 
+
 async function getShow(){
 	// show main data
-	let showData;
-	try{
-		showData = await getData(api_host+'/source/catalog/title/'+parseInt(argv.s,10),false,true,true);
-		checkResp(showData.body);
-	}
-	catch(error){
-		console.log(error,'\n');
-		process.exit(1);
-	}
+	let showData = await getData(api_host+'/source/catalog/title/'+parseInt(argv.s,10),false,true,true);
+	if(checkRes(showData)){return;}
 	// check errors
-	showData = JSON.parse(showData.body);
+	showData = JSON.parse(showData.res.body);
 	if(showData.status){
 		console.log('[ERROR] Error #'+showData.status+':',showData.data.errors[0].detail,'\n');
 		process.exit(1);
@@ -206,26 +195,24 @@ async function getShow(){
 	showData = showData.items[0];
 	console.log('[#'+showData.id+'] '+showData.title+' ('+showData.releaseYear+')');
 	// show episodes
-	let episodesData;
-	try{
-		let qs = {limit:-1,sort:'order',sort_direction:'ASC',title_id:parseInt(argv.s,10)};
-		if(argv.alt){ qs.language = 'English'; }
-		episodesData = await getData(api_host+'/funimation/episodes/',qs,true,true);
-		checkResp(episodesData.body);
-	}
-	catch(error){
-		console.log(error,'\n');
-		process.exit(1);
-	}
+	let qs = {limit:-1,sort:'order',sort_direction:'ASC',title_id:parseInt(argv.s,10)};
+	if(argv.alt){ qs.language = 'English'; }
+	let episodesData = await getData(api_host+'/funimation/episodes/',qs,true,true);
+	if(checkRes(episodesData)){return;}
+	let eps = JSON.parse(episodesData.res.body).items, fnSlug = [], is_selected = false;
+	argv.sel = typeof argv.sel == 'number' || typeof argv.sel == 'string' ? argv.sel.toString() : '';
+	argv.sel = argv.sel.match(',') ? argv.sel.split(',') : [argv.sel];
 	// parse episodes list
-	let eps = JSON.parse(episodesData.body).items,
-		fnSlug = false;
 	for(let e in eps){
 		let showStrId = eps[e].ids.externalShowId;
 		let epStrId = eps[e].ids.externalEpisodeId.replace(new RegExp('^'+showStrId),'');
 		// select
-		if(epStrId == argv.sel){
-			fnSlug = {title:eps[e].item.titleSlug,episode:eps[e].item.episodeSlug};
+		if(argv.sel.includes(epStrId.replace(/^0+/,''))){
+			fnSlug.push({title:eps[e].item.titleSlug,episode:eps[e].item.episodeSlug});
+			is_selected = true;
+		}
+		else{
+			is_selected = false;
 		}
 		// console vars
 		let tx_snum = eps[e].item.seasonNum==1?'':' S'+eps[e].item.seasonNum;
@@ -239,35 +226,38 @@ async function getShow(){
 		let conOut  = '['+episodeIdStr+'] ';
 			conOut += eps[e].item.titleName+tx_snum + ' - ' +tx_type+tx_enum+ ' ' +eps[e].item.episodeName+ ' ';
 			conOut += '('+rtm_str+') ['+qua_str+aud_str+ ']';
-			conOut += epStrId == argv.sel ? ' (selected)' : '';
+			conOut += is_selected ? ' (selected)' : '';
 			conOut += eps.length-1 == e ? '\n' : '';
 		console.log(conOut);
 	}
-	if(!fnSlug){
+	if(fnSlug.length>1){
+		batchDL = true;
+	}
+	if(fnSlug.length<1){
+		console.log('[INFO] Episodes not selected!\n');
 		process.exit();
 	}
-	// parse episode data
-	let episodeData;
-	try{
-		episodeData = await getData(api_host+'/source/catalog/episode/'+fnSlug.title+'/'+fnSlug.episode+'/',false,true,true);
-		checkResp(episodeData.body);
+	else{
+		for(let fnEp=0;fnEp<fnSlug.length;fnEp++){
+			await getEpisode(fnSlug[fnEp]);
+		}
 	}
-	catch(error){
-		console.log(error,'\n');
-		process.exit(1);
-	}
-	let ep = JSON.parse(episodeData.body).items[0], streamId = 0;
+}
+
+async function getEpisode(fnSlug){
+	let episodeData = await getData(api_host+'/source/catalog/episode/'+fnSlug.title+'/'+fnSlug.episode+'/',false,true,true);
+	if(checkRes(episodeData)){return;}
+	let ep = JSON.parse(episodeData.res.body).items[0], streamId = 0;
 	// build fn
 	fnTitle = argv.t ? argv.t : ep.parent.title;
 	ep.number = isNaN(ep.number) ? ep.number : ( parseInt(ep.number, 10) < 10 ? '0' + ep.number : ep.number );
 	if(ep.mediaCategory != 'Episode'){
 		ep.number = ep.number !== '' ? ep.mediaCategory+ep.number : ep.mediaCategory+'#'+ep.id;
 	}
-	fnEpNum = argv.ep ? ( parseInt(argv.ep, 10) < 10 ? '0' + argv.ep : argv.ep ) : ep.number;
-	fnSuffix = argv.suffix.replace('SIZEp',argv.q);
-	fnOutput = shlp.cleanupFilename('['+argv.a+'] ' + fnTitle + ' - ' + fnEpNum + ' ['+ fnSuffix +']');
+	fnEpNum = argv.ep && !batchDL ? ( parseInt(argv.ep, 10) < 10 ? '0' + argv.ep : argv.ep ) : ep.number;
 	// end
-	console.log('[INFO] Output filename: '+fnOutput,'\n\n[INFO] Available audio tracks:');
+	console.log(`[INFO] ${ep.parent.title} - S${(ep.parent.seasonNumber?ep.parent.seasonNumber:'?')}E${(ep.number?ep.number:'?')} - ${ep.title}`);
+	console.log('[INFO] Available audio tracks:');
 	for(let m in ep.media){
 		let selected = false;
 		if(ep.media[m].mediaType=='experience'){
@@ -287,37 +277,34 @@ async function getShow(){
 		}
 	}
 	if(streamId<1){
-		console.log('\n[ERROR] Dub not selected\n');
-		process.exit();
-	}
-	// get stream url
-	let streamData;
-	try{
-		streamData = await getData(api_host+'/source/catalog/video/'+streamId+'/signed',{"dinstid":"uuid"},true,true);
-		checkResp(streamData.body);
-	}
-	catch(error){
-		console.log(error,'\n');
-		process.exit(1);
-	}
-	streamData = JSON.parse(streamData.body);
-	if(streamData.errors){
-		console.log('\n[ERROR] Error #'+streamData.errors[0].code+':',streamData.errors[0].detail,'\n');
-		process.exit(1);
+		console.log('[ERROR] Track not selected\n');
+		return;
 	}
 	else{
-		for(let u in streamData.items){
-			if(streamData.items[u].videoType == 'm3u8'){
-				tsDlPath = streamData.items[u].src;
-				break;
+		let streamData = await getData(api_host+'/source/catalog/video/'+streamId+'/signed',{"dinstid":"uuid"},true,true);
+		if(checkRes(streamData)){return;}
+		streamData = JSON.parse(streamData.res.body);
+		tsDlPath = false;
+		if(streamData.errors){
+			console.log('[ERROR] Error #'+streamData.errors[0].code+':',streamData.errors[0].detail,'\n');
+			return;
+		}
+		else{
+			for(let u in streamData.items){
+				if(streamData.items[u].videoType == 'm3u8'){
+					tsDlPath = streamData.items[u].src;
+					break;
+				}
 			}
 		}
+		if(!tsDlPath){
+			console.log('[ERROR] Unknown error\n');
+			return;
+		}
+		else{
+			await downloadStreams();
+		}
 	}
-	if(!tsDlPath){
-		console.log('\n[ERROR] Unknown error\n');
-		process.exit(1);
-	}
-	downloadStreams();
 }
 
 function getSubsUrl(m){
@@ -335,20 +322,75 @@ function getSubsUrl(m){
 }
 
 async function downloadStreams(){
-	// to work dir
-	chdir(workDir.content);
+	// req playlist
+	let plQR = await getData(tsDlPath);
+	if(checkRes(plQR)){return;}
+	let plQAt = m3u8list(plQR.res.body);
+	plQAt = [...new Set(plQAt.map(x => JSON.stringify(x)))].map(x => JSON.parse(x));
+	let plQA = {}, plQAs = [], pl_max = 1;
+	for(let u in plQAt){
+		let pl_layer = parseInt(plQAt[u].url.match(/_Layer(\d+)\.m3u8$/)[1]);
+		pl_max = pl_max < pl_layer ? pl_layer : pl_max;
+		let pl_quality = plQAt[u].RESOLUTION.split('x')[1]+'p';
+		let pl_BANDWIDTH = Math.round(plQAt[u].BANDWIDTH/1024);
+		let pl_url = plQAt[u].url;
+		let dl_domain = pl_url.split('/')[2];
+		// if(dl_domain.match(/.dlvr1.net$/) && !dl_domain.match(/fallback/)){
+		if(dl_domain.match(/.cloudfront.net$/)){
+			plQAs.push(`${pl_layer}: ${pl_quality} (${pl_BANDWIDTH}KiB/s)`);
+			plQA[pl_layer] = { "q": pl_quality, "url": pl_url };
+		}
+	}
+	argv.q = argv.q < 1 ? pl_max : argv.q;
+	if(plQA[argv.q]){
+		console.log(`[INFO] Selected layer: ${argv.q}, Available qualities: ${plQAs.join(', ')}`);
+		fnSuffix = argv.suffix.replace('SIZEp',plQA[argv.q].q);
+		fnOutput = shlp.cleanupFilename('['+argv.a+'] ' + fnTitle + ' - ' + fnEpNum + ' ['+ fnSuffix +']');
+		console.log(`[INFO] Output filename: ${fnOutput}`);
+	}
+	else{
+		console.log(`[INFO] Available qualities: ${plQAs.join(', ')}`);
+		console.log(`[ERROR] Layer not selected\n`);
+		return;
+	}
 	// download video
-	let speedupSegments = '--hls-segment-attempts 10 --hls-segment-threads 10 --hls-segment-timeout 60';
-	if(!argv.nots){
-		shlp.exec('streamlink','"'+path.normalize(bin.streamlink)+'"','"hlsvariant://'+tsDlPath+'" '+argv.q+' '+speedupSegments+' -o "'+fnOutput+'.ts"',true);
+	let vidUrl = plQA[argv.q].url;
+	let reqVid = await getData(plQA[argv.q].url,false,true);
+	if(checkRes(reqVid)){return;}
+	let m3u8parse = new m3u8.Parser();
+	m3u8parse.push(reqVid.res.body);
+	m3u8parse.end();
+	let m3u8cfg = m3u8parse.manifest;
+	m3u8cfg.baseUrl = vidUrl.split('/').slice(0, -1).join('/')+'/';
+	// fs.writeFileSync(fnOutput+'.m3u8.json',JSON.stringify(m3u8cfg,null,'\t'));
+	let proxy;
+	if(argv.socks && !ssp){
+		proxy = { "ip": argv.socks, "type": "socks" };
+	}
+	else if(argv.proxy && !ssp){
+		proxy = { "ip": argv.proxy, "type": "http" };
+	}
+	let dldata = await streamdl(m3u8cfg, fnOutput, m3u8cfg.baseUrl, (proxy?proxy:false));
+	if(!dldata.ok){
+		console.log(`[ERROR] ${dldata.err}\n`);
+		return;
+	}
+	else{
+		console.log(`[INFO] Video downloaded!\n`);
 	}
 	// download subtitles
 	if(stDlPath){
 		console.log('\n[INFO] Downloading subtitles...');
 		let subsSrc = await getData(stDlPath);
-		fs.writeFileSync(fnOutput+'.vtt',subsSrc.body);
-		console.log('[INFO] Downloaded!');
+		if(!checkRes(plQR)){
+			fs.writeFileSync(fnOutput+'.vtt',subsSrc.res.body);
+			console.log('[INFO] Downloaded!');
+		}
+		else{
+			console.log('[ERROR] Failed to download subtitles!');
+		}
 	}
+	/*
 	// select muxer
 	if(argv.mkv){
 		// mux to mkv
@@ -404,14 +446,23 @@ async function downloadStreams(){
 		}
 	}
 	console.log('\n[INFO] Done!\n');
+	*/
 }
 
-// check response
-function checkResp(r){
-	if(r.match(/<!doctype html>/) || r.match(/<html/)){
-		console.log('[ERROR] unknown error, body:\n',r,'\n');
-		process.exit(1);
+function checkRes(r){
+	if(r && r.err){
+		console.log('[ERROR] Error: ', r.err, '\n', (r.res.body?r.res.body+'\n':''));
+		return true;
 	}
+	if(r.res && r.res.body && r.res.body.match(/^<!doctype/i) || r && r.res && r.res.body && r.res.body.match(/<html/)){
+		console.log('[ERROR] unknown error, body:\n', r.res.body.body ,'\n');
+		return true;
+	}
+	return false;
+}
+
+function log(data){
+	console.log(JSON.stringify(data,null,'\t'));
 }
 
 // get data fro url
@@ -452,13 +503,19 @@ function getData(url,qs,proxy,useToken,auth){
 		options.timeout = 10000;
 	}
 	// do request
-	return new Promise((resolve, reject) => {
-		request(options, (err, resp) => {
-			if (err) return reject(err);
-			if (resp.statusCode != 200 && resp.statusCode != 403) {
-				return reject(new Error(`\nStatus: ${resp.statusCode}`));
+	return new Promise((resolve) => {
+		request(options, (err, res) => {
+			if (err){
+				res = err;
+				resolve({ "err": "0", res });
 			}
-			resolve(resp);
+			if(auth && res.statusCode == 401){
+				resolve({res});
+			}
+			if (res.statusCode != 200 && res.statusCode != 403) {
+				resolve({ "err": res.statusCode, res });
+			}
+			resolve({res});
 		});
 	});
 }

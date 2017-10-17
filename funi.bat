@@ -1,5 +1,5 @@
 @echo off
 
-"node" "%~dp0.\scripts\funidl.js" %*
+"node" "%~dp0.\scripts\funi.js" %*
 
 pause
