@@ -53,7 +53,9 @@ function getURI(baseurl, uri) {
 async function dlparts(m3u8json, fn, baseurl, proxy) {
 	let keys = {}
 	// delete file if exists
-	fs.unlinkSync(`${fn}.ts`);
+	if(fs.existsSync(`${fn}.ts`)){
+		fs.unlinkSync(`${fn}.ts`);
+	}
 	// dl parts
 	const pcount = 10;
 	for (let p = 0; p < m3u8json.segments.length / pcount; p++) {
