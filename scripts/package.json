@@ -27,6 +27,7 @@
 		"request": "^2.53.0",
 		"sei-helper": "^1.1.0",
 		"socks5-https-client": "^1.2.1",
+		"vtt-to-srt": "https://github.com/clienthax/vtt-to-srt.git",
 		"yargs": "^9.0.1"
 	}
 }

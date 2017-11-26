@@ -11,6 +11,7 @@ const fs = require('fs');
 
 // modules extra
 const shlp = require('sei-helper');
+const vtt2srt = require('vtt-to-srt');
 const yargs = require('yargs');
 const request = require('request');
 const agent = require('socks5-https-client/lib/Agent');
@@ -81,7 +82,7 @@ let argv = yargs
 	
 	.describe('mkv','Mux into mkv')
 	.boolean('mkv')
-	.describe('mks','Add subtitles to mkv (if available)')
+	.describe('mks','Add subtitles to mkv or mp4 (if available)')
 	.boolean('mks')
 	
 	// login
@@ -353,6 +354,7 @@ async function downloadStreams(){
 		console.log(`[ERROR] Layer not selected\n`);
 		return;
 	}
+	
 	// download video
 	let vidUrl = plQA[argv.q].url;
 	let reqVid = await getData(plQA[argv.q].url,false,true);
@@ -378,19 +380,24 @@ async function downloadStreams(){
 	else{
 		console.log(`[INFO] Video downloaded!\n`);
 	}
+	
 	// download subtitles
 	if(stDlPath){
 		console.log('\n[INFO] Downloading subtitles...');
 		let subsSrc = await getData(stDlPath);
 		if(!checkRes(plQR)){
 			fs.writeFileSync(fnOutput+'.vtt',subsSrc.res.body);
-			console.log('[INFO] Downloaded!');
+			console.log('[INFO] Subtitles downloaded!');
+			fs.createReadStream(fnOutput+'.vtt')
+                .pipe(vtt2srt())
+                .pipe(fs.createWriteStream(fnOutput+'.srt'));
+            console.log('[INFO] Subtitles converted to srt!');
 		}
 		else{
 			console.log('[ERROR] Failed to download subtitles!');
 		}
 	}
-	/*
+	
 	// select muxer
 	if(argv.mkv){
 		// mux to mkv
@@ -398,11 +405,15 @@ async function downloadStreams(){
 			mkvmux += '--track-name "0:['+argv.a+']" --language "1:'+(argv.sub?'jpn':'eng')+'" --video-tracks 0 --audio-tracks 1 --no-subtitles --no-attachments ';
 			mkvmux += '"'+fnOutput+'.ts" ';
 			if(argv.mks && stDlPath){
-				mkvmux += '--language 0:eng "'+fnOutput+'.vtt" ';
+				mkvmux += '--language 0:eng "'+fnOutput+'.srt" ';
 			}
 		shlp.exec('mkvmerge','"'+path.normalize(bin.mkvmerge)+'"',mkvmux,true);
 		if(!argv.nocleanup){
 			fs.renameSync(fnOutput+'.ts', workDir.trash+'/'+fnOutput+'.ts');
+			if(stDlPath){
+			    fs.renameSync(fnOutput+'.vtt', workDir.trash+'/'+fnOutput+'.vtt');
+			    fs.renameSync(fnOutput+'.srt', workDir.trash+'/'+fnOutput+'.srt');
+			}
 		}
 	}
 	else{
@@ -435,6 +446,9 @@ async function downloadStreams(){
 		// mux to mp4
 		let mp4mux  = '-add "'+fnOutput+'.264#video:name=['+argv.a+']" ';
 			mp4mux += '-add "'+fnOutput+'.aac#audio:lang='+(argv.sub?'jpn':'eng')+':name=" ';
+			if(argv.mks && stDlPath){
+				mp4mux += '-add "'+fnOutput+'.srt"';
+			}
 			mp4mux += '-new "'+fnOutput+'.mp4" ';
 		shlp.exec('mp4box','"'+path.normalize(bin.mp4box)+'"',mp4mux,true);
 		// cleanup
@@ -443,10 +457,14 @@ async function downloadStreams(){
 			fs.renameSync(fnOutput+'.ts', workDir.trash+'/'+fnOutput+'.ts');
 			fs.renameSync(fnOutput+'.264', workDir.trash+'/'+fnOutput+'.264');
 			fs.renameSync(fnOutput+'.aac', workDir.trash+'/'+fnOutput+'.aac');
+			if(stDlPath){
+			    fs.renameSync(fnOutput+'.vtt', workDir.trash+'/'+fnOutput+'.vtt');
+			    fs.renameSync(fnOutput+'.srt', workDir.trash+'/'+fnOutput+'.srt');
+			}
 		}
 	}
 	console.log('\n[INFO] Done!\n');
-	*/
+	
 }
 
 function checkRes(r){
