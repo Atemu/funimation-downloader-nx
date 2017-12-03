@@ -10,7 +10,7 @@ This application is not endorsed by or affiliated with *Funimation*. This applic
 
 * NodeJS >= 7.8.0 (https://nodejs.org/)
 * NPM >= 4.0.0 (https://www.npmjs.org/)
-* Streamlink >= 0.5.0 (https://github.com/streamlink/streamlink)
+* git (https://github.com/git/git)
 * tsMuxeR >= 2.6.12 (https://www.videohelp.com/software/tsMuxeR)
 * MP4Box >= 0.6.0 (https://github.com/gpac/gpac)
 * MKVToolNix >= 10.0.0 (https://github.com/mbunkus/mkvtoolnix)
@@ -18,7 +18,6 @@ This application is not endorsed by or affiliated with *Funimation*. This applic
 ### Paths Configuration
 
 By default this application uses the following paths to programs (main executables):
-* `./bin/streamlink/build/streamlink`
 * `./bin/tsMuxeR/tsMuxeR`
 * `./bin/mp4box/mp4box`
 * `./bin/mkvtoolnix/mkvmerge`
@@ -53,7 +52,7 @@ After installing NodeJS with NPM goto `scripts` directory and type: `npm i`
 
 `[note] this application mux into mp4 by default`
 * `--mkv` mux into mkv
-* `--mks` add subtitles to mkv (if available)
+* `--mks` add subtitles to mkv or mp4 (if available)
 
 ### Filenaming Options (optional)
 
