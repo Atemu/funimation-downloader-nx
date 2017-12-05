@@ -10,7 +10,6 @@ This application is not endorsed by or affiliated with *Funimation*. This applic
 
 * NodeJS >= 7.8.0 (https://nodejs.org/)
 * NPM >= 4.0.0 (https://www.npmjs.org/)
-* git (https://github.com/git/git)
 * tsMuxeR >= 2.6.12 (https://www.videohelp.com/software/tsMuxeR)
 * MP4Box >= 0.6.0 (https://github.com/gpac/gpac)
 * MKVToolNix >= 10.0.0 (https://github.com/mbunkus/mkvtoolnix)

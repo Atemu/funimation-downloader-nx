@@ -11,7 +11,6 @@ const fs = require('fs');
 
 // modules extra
 const shlp = require('sei-helper');
-const vtt2srt = require('vtt-to-srt');
 const yargs = require('yargs');
 const request = require('request');
 const agent = require('socks5-https-client/lib/Agent');
@@ -315,7 +314,7 @@ function getSubsUrl(m){
 	for(let i in m){
 		let fpp = m[i].filePath.split('.');
 		let fpe = fpp[fpp.length-1];
-		if(fpe == 'vtt'){
+		if(fpe == 'srt'){
 			return m[i].filePath;
 		}
 	}
@@ -344,7 +343,7 @@ async function downloadStreams(){
 	}
 	argv.q = argv.q < 1 ? pl_max : argv.q;
 	if(plQA[argv.q]){
-		console.log(`[INFO] Selected layer: ${argv.q}, Available qualities: ${plQAs.join(', ')}`);
+		console.log(`[INFO] Selected layer: ${argv.q}\n\tAvailable qualities:\n\t\t${plQAs.join('\n\t\t')}`);
 		fnSuffix = argv.suffix.replace('SIZEp',plQA[argv.q].q);
 		fnOutput = shlp.cleanupFilename('['+argv.a+'] ' + fnTitle + ' - ' + fnEpNum + ' ['+ fnSuffix +']');
 		console.log(`[INFO] Output filename: ${fnOutput}`);
@@ -366,13 +365,14 @@ async function downloadStreams(){
 	m3u8cfg.baseUrl = vidUrl.split('/').slice(0, -1).join('/')+'/';
 	// fs.writeFileSync(fnOutput+'.m3u8.json',JSON.stringify(m3u8cfg,null,'\t'));
 	let proxy;
-	if(argv.socks && !ssp){
+	if(argv.socks && !argv.ssp){
 		proxy = { "ip": argv.socks, "type": "socks" };
 	}
-	else if(argv.proxy && !ssp){
+	else if(argv.proxy && !argv.ssp){
 		proxy = { "ip": argv.proxy, "type": "http" };
 	}
 	let dldata = await streamdl(m3u8cfg, fnOutput, m3u8cfg.baseUrl, (proxy?proxy:false));
+	// let dldata = {"ok":true};
 	if(!dldata.ok){
 		console.log(`[ERROR] ${dldata.err}\n`);
 		return;
@@ -384,14 +384,11 @@ async function downloadStreams(){
 	// download subtitles
 	if(stDlPath){
 		console.log('\n[INFO] Downloading subtitles...');
-		let subsSrc = await getData(stDlPath);
-		if(!checkRes(plQR)){
-			fs.writeFileSync(fnOutput+'.vtt',subsSrc.res.body);
+		// console.log(stDlPath);
+		let subsSrc = await getData(stDlPath,false,true);
+		if(!checkRes(subsSrc)){
+			fs.writeFileSync(fnOutput+'.srt',subsSrc.res.body);
 			console.log('[INFO] Subtitles downloaded!');
-			fs.createReadStream(fnOutput+'.vtt')
-                .pipe(vtt2srt())
-                .pipe(fs.createWriteStream(fnOutput+'.srt'));
-            console.log('[INFO] Subtitles converted to srt!');
 		}
 		else{
 			console.log('[ERROR] Failed to download subtitles!');
@@ -410,9 +407,9 @@ async function downloadStreams(){
 		shlp.exec('mkvmerge','"'+path.normalize(bin.mkvmerge)+'"',mkvmux,true);
 		if(!argv.nocleanup){
 			fs.renameSync(fnOutput+'.ts', workDir.trash+'/'+fnOutput+'.ts');
-			if(stDlPath){
-			    fs.renameSync(fnOutput+'.vtt', workDir.trash+'/'+fnOutput+'.vtt');
-			    fs.renameSync(fnOutput+'.srt', workDir.trash+'/'+fnOutput+'.srt');
+			if(stDlPath && argv.mks){
+				// fs.renameSync(fnOutput+'.vtt', workDir.trash+'/'+fnOutput+'.vtt');
+				fs.renameSync(fnOutput+'.srt', workDir.trash+'/'+fnOutput+'.srt');
 			}
 		}
 	}
@@ -457,23 +454,22 @@ async function downloadStreams(){
 			fs.renameSync(fnOutput+'.ts', workDir.trash+'/'+fnOutput+'.ts');
 			fs.renameSync(fnOutput+'.264', workDir.trash+'/'+fnOutput+'.264');
 			fs.renameSync(fnOutput+'.aac', workDir.trash+'/'+fnOutput+'.aac');
-			if(stDlPath){
-			    fs.renameSync(fnOutput+'.vtt', workDir.trash+'/'+fnOutput+'.vtt');
-			    fs.renameSync(fnOutput+'.srt', workDir.trash+'/'+fnOutput+'.srt');
+			if(stDlPath && argv.mks){
+				// fs.renameSync(fnOutput+'.vtt', workDir.trash+'/'+fnOutput+'.vtt');
+				fs.renameSync(fnOutput+'.srt', workDir.trash+'/'+fnOutput+'.srt');
 			}
 		}
 	}
 	console.log('\n[INFO] Done!\n');
-	
 }
 
 function checkRes(r){
-	if(r && r.err){
-		console.log('[ERROR] Error: ', r.err, '\n', (r.res.body?r.res.body+'\n':''));
+	if(r.err){
+		console.log('[ERROR] Error: ', r.err, '\n', (typeof r.res.body !== 'undefined'?r.res.body+'\n':''));
 		return true;
 	}
-	if(r.res && r.res.body && r.res.body.match(/^<!doctype/i) || r && r.res && r.res.body && r.res.body.match(/<html/)){
-		console.log('[ERROR] unknown error, body:\n', r.res.body.body ,'\n');
+	if(r.res && r.res.body && r.res.body.match(/^<!doctype/i) || r.res && r.res.body && r.res.body.match(/<html/)){
+		console.log('[ERROR] unknown error, body:\n', r.res.body ,'\n');
 		return true;
 	}
 	return false;

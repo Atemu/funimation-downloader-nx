@@ -1,7 +1,9 @@
 const agent = require('socks5-https-client/lib/Agent');
 const crypto = require('crypto');
 const request = require('request');
+const shlp = require('sei-helper');
 const fs = require('fs');
+let date_start;
 
 // async
 function getData(method, url, proxy) {
@@ -81,11 +83,21 @@ async function dlparts(m3u8json, fn, baseurl, proxy) {
 			throw new Error(`${prq.size} parts not downloaded`);
 		}
 		let dled = offset + 10;
-		console.log(`[INFO] ${dled<m3u8json.segments.length?dled:m3u8json.segments.length} parts of ${m3u8json.segments.length} downloaded`);
+		
+		getDLedInfo((dled<m3u8json.segments.length?dled:m3u8json.segments.length),m3u8json.segments.length);
+		
 		for (let r of res) {
 			fs.writeFileSync(`${fn}.ts`, r, { flag: 'a' });
 		}
 	}
+}
+
+function getDLedInfo(dled,total){
+	const date_elapsed = Date.now() - date_start;
+	const percentFxd = (dled / total * 100).toFixed();
+	const percent = percentFxd < 100 ? percentFxd : 99;
+	const time = shlp.htime(((parseInt(date_elapsed * (total / dled - 1))) / 1000).toFixed());
+	console.log(`[INFO] ${dled} parts of ${total} downloaded [${percent}%] (${time})`);
 }
 
 async function getDecipher(pd, keys, baseurl, proxy) {
@@ -132,6 +144,7 @@ module.exports = async (m3u8json, fn, baseurl, proxy) => {
 	ttlLng = m3u8json.segments.length.toString().length;
 	let res = { "ok": true };
 	try {
+		date_start = Date.now();
 		await dlparts(m3u8json, fn, baseurl, proxy);
 	} catch (error) {
 		res = { "ok": false, "err": error };
