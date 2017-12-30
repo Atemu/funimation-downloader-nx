@@ -11,4 +11,5 @@ package-lock.json
 *.264
 *.aac
 *.vtt
+*.srt
 *.meta

@@ -20,6 +20,9 @@ const m3u8list = require('m3u8-stream-list');
 const m3u8 = require('m3u8-parser');
 const streamdl = require('./module.hls-download');
 
+// ttml2srt
+const ttml2srt = require('./module.ttml-parser');
+
 // folders
 const configDir  = path.join(__dirname,'/config/');
 const configBase = path.join(__dirname,'/base/');
@@ -61,9 +64,9 @@ let argv = yargs
 	.describe('sub','Subtitles mode (Dub mode by default)')
 	.boolean('sub')
 	
-	//.describe('q','Video quality')
-	//.choices('q', ['234p','270p','288p','360p','480p','540p','720p','1080p'])
-	//.default('q','720p')
+	// .describe('q','Video quality')
+	// .choices('q', ['234p','270p','288p','360p','480p','540p','720p','1080p'])
+	// .default('q','720p')
 	
 	.describe('q','Video layer (0=max)')
 	.choices('q', [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
@@ -145,7 +148,7 @@ else if(argv.s && !isNaN(parseInt(argv.s,10)) && parseInt(argv.s,10) > 0){
 	getShow();
 }
 else{
-	console.log(yargs.showHelp());
+	yargs.showHelp();
 	process.exit();
 }
 
@@ -314,7 +317,7 @@ function getSubsUrl(m){
 	for(let i in m){
 		let fpp = m[i].filePath.split('.');
 		let fpe = fpp[fpp.length-1];
-		if(fpe == 'srt'){
+		if(fpe == 'dfxp'){ // dfxp, srt, vtt
 			return m[i].filePath;
 		}
 	}
@@ -383,11 +386,13 @@ async function downloadStreams(){
 	
 	// download subtitles
 	if(stDlPath){
-		console.log('\n[INFO] Downloading subtitles...');
+		console.log('[INFO] Downloading subtitles...');
 		// console.log(stDlPath);
 		let subsSrc = await getData(stDlPath,false,true);
 		if(!checkRes(subsSrc)){
-			fs.writeFileSync(fnOutput+'.srt',subsSrc.res.body);
+			// let srtData = subsSrc.res.body;
+			let srtData = ttml2srt(subsSrc.res.body);
+			fs.writeFileSync(fnOutput+'.srt',srtData);
 			console.log('[INFO] Subtitles downloaded!');
 		}
 		else{
@@ -465,11 +470,11 @@ async function downloadStreams(){
 
 function checkRes(r){
 	if(r.err){
-		console.log('[ERROR] Error: ', r.err, '\n', (typeof r.res.body !== 'undefined'?r.res.body+'\n':''));
+		console.log(`[ERROR] Error: ${r.err}\n`, (typeof r.res.body !== 'undefined'?`${r.res.body}\n`:''));
 		return true;
 	}
 	if(r.res && r.res.body && r.res.body.match(/^<!doctype/i) || r.res && r.res.body && r.res.body.match(/<html/)){
-		console.log('[ERROR] unknown error, body:\n', r.res.body ,'\n');
+		console.log(`[ERROR] unknown error, body:\n${r.res.body}\n`);
 		return true;
 	}
 	return false;
@@ -479,7 +484,7 @@ function log(data){
 	console.log(JSON.stringify(data,null,'\t'));
 }
 
-// get data fro url
+// get data from url
 function getData(url,qs,proxy,useToken,auth){
 	let options = {};
 	// request parameters
