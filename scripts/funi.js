@@ -18,26 +18,18 @@ const agent = require('socks5-https-client/lib/Agent');
 // m3u8
 const m3u8list = require('m3u8-stream-list');
 const m3u8 = require('m3u8-parser');
-const streamdl = require('./module.hls-download');
+const streamdl = require('hls-download');
 
 // ttml2srt
 const ttml2srt = require('./module.ttml-parser');
 
 // folders
-const configDir  = path.join(__dirname,'/config/');
-const configBase = path.join(__dirname,'/base/');
-let bin, workDir = {};
-
-// check folders
-if(fs.existsSync(configBase)){
-	bin             = require(path.join(configBase,'/config.bin.js'));
-	workDir         = require(path.join(configBase,'/config.dir.js'));
-}
-else{
-	bin             = require(path.join(configDir,'/config.bin.js'));
-	workDir.content = path.join(__dirname,'/../videos/');
-	workDir.trash   = path.join(__dirname,'/../videos/_trash/');
-}
+const configDir = path.join(__dirname,'/config/');
+const bin = require(path.join(configDir,'/config.bin.js'));
+const workDir = {
+	content: path.join(__dirname,'/../videos/'),
+	trash  : path.join(__dirname,'/../videos/_trash/')
+};
 
 // auth check
 let token = false;
@@ -93,6 +85,9 @@ let argv = yargs
 	
 	// proxy
 	.describe('socks','Set ipv4 socks5 proxy')
+	.describe('socks-login','Set socks5 username')
+	.describe('socks-pass','Set socks5 password')
+	
 	.describe('proxy','Set ipv4 http(s) proxy')
 	.describe('ssp','Don\'t use proxy for stream downloading')
 	.boolean('ssp')
@@ -514,6 +509,10 @@ function getData(url,qs,proxy,useToken,auth){
 			socksHost: argv.socks.split(':')[0],
 			socksPort: argv.socks.split(':')[1]
 		};
+		if(argv['socks-login'] && argv['socks-pass']){
+			agentOptions.socksUsername = argv['socks-login'];
+			agentOptions.socksPassword = argv['socks-pass'];
+		}
 		options.agentOptions = agentOptions;
 		options.timeout = 10000;
 	}
