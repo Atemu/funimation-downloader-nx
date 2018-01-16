@@ -365,12 +365,20 @@ async function downloadStreams(){
 	let proxy;
 	if(argv.socks && !argv.ssp){
 		proxy = { "ip": argv.socks, "type": "socks" };
+		if(argv['socks-login'] && argv['socks-pass']){
+			proxy['socks-login'] = argv['socks-login'];
+			proxy['socks-pass'] = argv['socks-pass'];
+		}
 	}
 	else if(argv.proxy && !argv.ssp){
 		proxy = { "ip": argv.proxy, "type": "http" };
 	}
-	let dldata = await streamdl(m3u8cfg, fnOutput, m3u8cfg.baseUrl, (proxy?proxy:false));
-	// let dldata = {"ok":true};
+	let dldata = await streamdl({
+		fn: fnOutput,
+		m3u8json: m3u8cfg,
+		baseurl: m3u8cfg.baseUrl,
+		proxy: (proxy?proxy:false)
+	});
 	if(!dldata.ok){
 		console.log(`[ERROR] ${dldata.err}\n`);
 		return;
