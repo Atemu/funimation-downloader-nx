@@ -11,8 +11,8 @@ This application is not endorsed by or affiliated with *Funimation*. This applic
 * NodeJS >= 9.4.0 (https://nodejs.org/)
 * NPM >= 5.3.0 (https://www.npmjs.org/)
 * tsMuxeR >= 2.6.12 (https://www.videohelp.com/software/tsMuxeR)
-* MP4Box >= 0.7.0 (https://github.com/gpac/gpac)
-* MKVToolNix >= 20.0.0 (https://github.com/mbunkus/mkvtoolnix)
+* MP4Box >= 0.7.0 (https://www.videohelp.com/software/MP4Box)
+* MKVToolNix >= 20.0.0 (https://www.videohelp.com/software/MKVToolNix)
 
 ### Paths Configuration
 
@@ -21,11 +21,13 @@ By default this application uses the following paths to programs (main executabl
 * `./bin/mp4box/mp4box`
 * `./bin/mkvtoolnix/mkvmerge`
 
-To change these paths you need to edit `config.bin.js` in `./scripts/config/` directory.
+To change these paths you need to edit `config.bin.js` in `./config/` directory.
 
 ### Node Modules
 
-After installing NodeJS with NPM goto `scripts` directory and type: `npm i`
+[![dependencies status](https://david-dm.org/sseiya-dev/funimation-downloader-nx/status.svg?style=flat-square)](https://david-dm.org/seiya-dev/funimation-downloader-nx)
+
+After installing NodeJS with NPM goto directory with `package.json` file and type: `npm i`
 
 ## Switches
 

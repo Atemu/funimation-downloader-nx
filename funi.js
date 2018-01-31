@@ -1,13 +1,13 @@
+// modules build-in
+const path = require('path');
+const fs = require('fs');
+
 // package json
-const packageJson = require('./package.json');
+const packageJson = require(path.join(__dirname,'package.json'));
 
 // program name
 console.log('\n=== Funimation Downloader NX '+packageJson.version+' ===\n');
 const api_host = 'https://prod-api-funimationnow.dadcdigital.com/api';
-
-// modules build-in
-const path = require('path');
-const fs = require('fs');
 
 // modules extra
 const shlp = require('sei-helper');
@@ -20,15 +20,12 @@ const m3u8list = require('m3u8-stream-list');
 const m3u8 = require('m3u8-parser');
 const streamdl = require('hls-download');
 
-// ttml2srt
-const ttml2srt = require('./module.ttml-parser');
-
 // folders
 const configDir = path.join(__dirname,'/config/');
 const bin = require(path.join(configDir,'/config.bin.js'));
 const workDir = {
-	content: path.join(__dirname,'/../videos/'),
-	trash  : path.join(__dirname,'/../videos/_trash/')
+	content: path.join(__dirname,'/videos/'),
+	trash  : path.join(__dirname,'/videos/_trash/')
 };
 
 // auth check
@@ -52,7 +49,7 @@ let argv = yargs
 	.describe('alt','Alternative episode listing (if available)')
 	.boolean('alt')
 	
-	.describe('sel','Select episode')
+	.describe('sel','Select episode ids (coma-separated)')
 	.describe('sub','Subtitles mode (Dub mode by default)')
 	.boolean('sub')
 	
@@ -67,7 +64,7 @@ let argv = yargs
 	.describe('a','Release group')
 	.default('a','Funimation')
 	.describe('t','Filename: series title override')
-	.describe('ep','Filename: episode number override')
+	.describe('ep','Filename: episode number override (ignored in batch mode)')
 	.describe('suffix','Filename: filename suffix override (first "SIZEp" will be raplaced with actual video size)')
 	.default('suffix','SIZEp')
 	
@@ -544,4 +541,61 @@ function getData(url,qs,proxy,useToken,auth){
 			resolve({res});
 		});
 	});
+}
+
+// ttml2srt module
+
+function ttml2srt(data) {
+	let f = data.match(/ttp:frameRate\s*=\s*"(.*?)"/);
+	let frameRate = f ? parseInt(f[1]) : 25;
+	let reStr = '<p style.*?begin="([^"]*)" end="([^"]*)".*?>(.*?)</p>';
+	let gre = new RegExp(reStr, 'g');
+	let re = new RegExp(reStr);
+	let res = '';
+	let str_id = 0;
+	for (let x of data.match(gre)) {
+		let m = x.match(re);
+		if (m) {
+			let begin = formatSrtTime(m[1], frameRate);
+			let end = formatSrtTime(m[2], frameRate);
+			let text = m[3]
+				.replace(/(<br.*?>)+/g, '\n')
+				.replace(/<(\S*?) (.*?)>(.*?)<\/.*?>/g, fontRepl);
+			if(text.trim() !== ''){
+				str_id++;
+				res += `${str_id}\n${begin} --> ${end}\n${text}\n\n`;
+			}
+		}
+	}
+	return res;
+}
+function formatSrtTime(time, frameRate) {
+	let t = time.match(/(.*):([^:]*)$/);
+	let ms = Math.floor(parseInt(t[2]) * 1000 / frameRate).toString();
+	return t[1] + ',' + ms.padStart(3, '0');
+}
+function fontRepl(str, tag, attrs, txt) {
+	if (tag != 'span') {
+		return txt;
+	}
+	let at = attrs.replace(/\s*=\s*/g, '=').split(' ').filter(x => x.trim());
+	for (let a of at) {
+		let ax = a.match(/tts:color="(.*?)"/);
+		if (ax) {
+			txt = `<font color="${ax[1]}">${txt}</font>`;
+			continue;
+		}
+		switch (a) {
+			case 'tts:fontStyle="italic"':
+				txt = `<i>${txt}</i>`;
+				break;
+			case 'tts:textDecoration="underline"':
+				txt = `<u>${txt}</u>`;
+				break;
+			case 'tts:fontWeight="bold"':
+				txt = `<b>${txt}</b>`;
+				break;
+		}
+	}
+	return txt;
 }
