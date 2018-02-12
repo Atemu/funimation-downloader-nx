@@ -25,9 +25,8 @@ To change these paths you need to edit `config.bin.js` in `./config/` directory.
 
 ### Node Modules
 
-[![dependencies status](https://david-dm.org/sseiya-dev/funimation-downloader-nx/status.svg?style=flat-square)](https://david-dm.org/seiya-dev/funimation-downloader-nx)
-
-After installing NodeJS with NPM goto directory with `package.json` file and type: `npm i`
+After installing NodeJS with NPM goto directory with `package.json` file and type: `npm i`.
+* [check dependencies](https://david-dm.org/seiya-dev/funimation-downloader-nx)
 
 ## Switches
 
@@ -50,9 +49,10 @@ After installing NodeJS with NPM goto directory with `package.json` file and typ
 ### Proxy
 
 * `--socks <s>` set ipv4 socks5 proxy for all requests to funimation api
-* `--socks-login <s>` Set username for socks5 proxy
-* `--socks-pass <s>`  Set password for socks5 proxy
+* `--socks-login <s>` set username for socks5 proxy
+* `--socks-pass <s>`  set password for socks5 proxy
 * `--proxy <s>` set ipv4 http(s) proxy for all requests to funimation api
+* `--ssp` don't use proxy for stream downloading
 
 ### Muxing
 

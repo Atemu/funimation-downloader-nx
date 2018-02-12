@@ -68,7 +68,7 @@ let argv = yargs
 	.describe('suffix','Filename: filename suffix override (first "SIZEp" will be raplaced with actual video size)')
 	.default('suffix','SIZEp')
 	
-	.describe('nosubs','skip download subtitles for Dub (if available)')
+	.describe('nosubs','Skip download subtitles for Dub (if available)')
 	.boolean('nosubs')
 	
 	.describe('mkv','Mux into mkv')
@@ -470,11 +470,17 @@ async function downloadStreams(){
 
 function checkRes(r){
 	if(r.err){
-		console.log(`[ERROR] Error: ${r.err}\n`, (typeof r.res.body !== 'undefined'?`${r.res.body}\n`:''));
+		console.log(`[ERROR] Error: ${r.err}`);
+		if(r.res && r.res.body){
+			console.log(`[ERROR] Body:\n${r.res.body}\n`);
+		}
+		else{
+			console.log(`[ERROR] Additional info:\n${JSON.stringify(r.res,null,'\t')}\n`);
+		}
 		return true;
 	}
 	if(r.res && r.res.body && r.res.body.match(/^<!doctype/i) || r.res && r.res.body && r.res.body.match(/<html/)){
-		console.log(`[ERROR] unknown error, body:\n${r.res.body}\n`);
+		console.log(`[ERROR] Error: ${r.err}, body:\n${r.res.body}\n`);
 		return true;
 	}
 	return false;
