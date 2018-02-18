@@ -39,6 +39,7 @@ if(fs.existsSync(cfgFilename)){
 let argv = yargs
 	.wrap(Math.min(100))
 	.usage('Usage: $0 [options]')
+	.help(false).version(false)
 	
 	// login
 	.describe('mail','Your email')
@@ -93,6 +94,7 @@ let argv = yargs
 	.describe('h','Show this help')
 	.alias('h','help')
 	.boolean('h')
+	.version(false)
 	
 	.argv;
 
