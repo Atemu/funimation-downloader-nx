@@ -32,7 +32,8 @@ const workDir = {
 let token = false;
 const cfgFilename = configDir + '/funi_auth.json';
 if(fs.existsSync(cfgFilename)){
-    token = require(cfgFilename).token;
+    token = require(cfgFilename);
+    token = token.token && typeof token.token == 'string' ? token.token : false;
 }
 
 // cli
@@ -511,10 +512,13 @@ function getData(url,qs,proxy,useToken,auth){
         options.headers = {
             Authorization: 'Token '+token
         };
-        if(options.qs && options.qs.dinstid){
-            options.headers.devicetype = 'Android Phone';
-            delete options.qs;
+    }
+    if(options.qs && options.qs.dinstid){
+        if(!options.headers){
+            options.headers = {};
         }
+        options.headers.devicetype = 'Android Phone';
+        delete options.qs;
     }
     if(proxy && argv.socks){
         options.agentClass = agent;
