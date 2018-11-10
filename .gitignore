@@ -2,7 +2,7 @@
 /bin/mp4box/*
 /bin/streamlink/*
 /bin/tsmuxer/*
-/scripts/node_modules/*
+/node_modules/*
 funi_auth.json
 package-lock.json
 *.ts
@@ -11,4 +11,5 @@ package-lock.json
 *.264
 *.aac
 *.vtt
+*.srt
 *.meta
