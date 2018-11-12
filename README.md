@@ -26,7 +26,7 @@ To change these paths you need to edit `config.main.yml` in `./modules/` directo
 After installing NodeJS with NPM goto directory with `package.json` file and type: `npm i`.
 * [check dependencies](https://david-dm.org/seiya-dev/funimation-downloader-nx)
 
-## Switches
+## CLI Options
 
 ### Authentication
 
@@ -41,9 +41,10 @@ After installing NodeJS with NPM goto directory with `package.json` file and typ
 * `-s <i> -e <s>` sets the show id and episode ids (coma-separated)
 * `--simul` force select simulcast version instead of uncut version
 * `--alt` alternative episode listing (if available)
-* `-q <i>` sets the video layer quality [1...10] (optional, 0=max by default)
+* `-q <i>` sets the video layer quality [1...10] (optional, 0 is max)
 * `--sub` switch from English dub to Japanese dub with subtitles
 * `--nosubs` skip download subtitles for Dub (if available)
+* `-x` select server (1 is cloudfront.net, 2...3 is dlvr1.net)
 
 ### Proxy
 
@@ -59,7 +60,7 @@ After installing NodeJS with NPM goto directory with `package.json` file and typ
 * `--mp4` mux into mp4
 * `--mks` add subtitles to mkv or mp4 (if available)
 
-### Filenaming Options (optional)
+### Filenaming (optional)
 
 * `-a <s>` release group ("Funimation" by default)
 * `-t <s>` show title override
@@ -70,7 +71,7 @@ After installing NodeJS with NPM goto directory with `package.json` file and typ
 
 * `--nocleanup` move unnecessary files to trash folder after completion instead of deleting
 
-### Filename Template
+## Filename Template
 
 [`release group`] `title` - `episode` [`suffix`].`extension`
 

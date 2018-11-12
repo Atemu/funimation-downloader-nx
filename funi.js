@@ -68,6 +68,10 @@ let argv = yargs
     .choices('q', [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
     .default('q', cfg.cli.videoLayer)
     
+    .describe('x','Select server (1 is cloudfront.net, 2...3 is dlvr1.net)')
+    .choices('x', [1, 2, 3])
+    .default('x', cfg.cli.nServer)
+    
     .describe('simul','Forse download simulcast version instead of uncut')
     .boolean('simul')
     
@@ -367,8 +371,8 @@ async function downloadStreams(){
     
     // build
     let plQuality = {};
+    let plQualityAlt = {};
     let plQualityStr = [];
-    let domains = [];
     let pl_max = 1;
     
     for(let s of plQualityLinkList.playlists){
@@ -378,17 +382,32 @@ async function downloadStreams(){
         let pl_quality = s.attributes.RESOLUTION.height+'p';
         let pl_url = s.uri;
         let dl_domain = pl_url.split('/')[2];
+        if(typeof plQualityAlt[pl_layer] == 'undefined'){
+            plQualityAlt[pl_layer] = [];
+        }
         if(dl_domain.match(/.cloudfront.net$/)){
             plQualityStr.push(`${pl_layer}: ${pl_quality} (${pl_BANDWIDTH}KiB/s)`);
             plQuality[pl_layer] = { "q": pl_quality, "url": pl_url };
         }
+        else{
+            plQualityAlt[pl_layer].push({ "q": pl_quality, "url": pl_url });
+        }
     }
     
-    argv.q = argv.q < 1 ? pl_max : argv.q;
+    // select quality and server
+    argv.x = argv.x - 1;
+    argv.q = argv.q < 1 && argv.q > pl_max ? pl_max : argv.q;
+    let maxServers = plQualityAlt[argv.q].length + 1;
+    if(argv.x > 0){
+        plQuality[argv.q] = argv.x > maxServers-1 ? plQualityAlt[argv.q][0] : plQualityAlt[argv.q][argv.x-1];
+    }
+    let vidUrl = plQuality[argv.q].url;
     
     if(plQuality[argv.q]){
         console.log(`[INFO] Selected layer: ${argv.q}\n\tAvailable qualities:\n\t\t${plQualityStr.join('\n\t\t')}`);
         fnSuffix = argv.suffix.replace('SIZEp',plQuality[argv.q].q);
+        console.log(`[INFO] Selected server: ` + ( argv.x < 1 ? `1` : ( argv.x > maxServers-1 ? maxServers : argv.x+1 ) ) + ` / Total servers available: ` + maxServers );
+        console.log(`[INFO] Stream URL: `+vidUrl);
         fnOutput = shlp.cleanupFilename('['+argv.a+'] ' + fnTitle + ' - ' + fnEpNum + ' ['+ fnSuffix +']');
         console.log(`[INFO] Output filename: ${fnOutput}`);
     }
@@ -399,7 +418,6 @@ async function downloadStreams(){
     }
     
     // download video
-    let vidUrl = plQuality[argv.q].url;
     let reqVid = await getData(vidUrl,false,true);
     if(checkRes(reqVid)){return;}
     
