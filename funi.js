@@ -6,8 +6,8 @@ const fs = require('fs');
 const packageJson = require(path.join(__dirname,'package.json'));
 
 // program name
-console.log('\n=== Funimation Downloader NX '+packageJson.version+' ===\n');
-const api_host = 'https://prod-api-funimationnow.dadcdigital.com/api';
+console.log(`\n=== Funimation Downloader NX ${packageJson.version} ===\n`);
+const api_host = `https://prod-api-funimationnow.dadcdigital.com/api`;
 
 // modules extra
 const yaml = require('yaml');
@@ -34,7 +34,10 @@ if(!fs.existsSync(configFile)){
     process.exit();
 }
 else{
-    cfg = yaml.parse(fs.readFileSync(configFile, 'utf8'));
+    cfg = yaml.parse(
+        fs.readFileSync(configFile, 'utf8')
+            .replace(/\${__dirname}/g,__dirname.replace(/\\/g,'/'))
+    );
 }
 
 if(fs.existsSync(tokenFile)){
@@ -55,35 +58,40 @@ let argv = yargs
     .describe('user','Your username or email')
     .describe('pass','Your password')
     
-    // params
-    .describe('s','Set show id')
-    .describe('alt','Alternative episode listing (if available)')
-    .boolean('alt')
+    // search
+    .describe('search','Sets the show title for search')
     
-    .describe('e','Select episode ids (coma-separated)')
-    .describe('sub','Subtitles mode (Dub mode by default)')
-    .boolean('sub')
+    // params
+    .describe('s','Sets the show id')
+    .describe('e','Select episode ids (comma-separated, hyphen-sequence)')
     
     .describe('q','Video layer (0 is max)')
     .choices('q', [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
     .default('q', cfg.cli.videoLayer)
     
+    .describe('alt','Alternative episode listing (if available)')
+    .boolean('alt')
+    
+    .describe('sub','Subtitles mode (Dub mode by default)')
+    .boolean('sub')
+    
+    .describe('simul','Forсe download simulcast version instead of uncut')
+    .boolean('simul')
+    
     .describe('x','Select server (1 is cloudfront.net, 2...3 is dlvr1.net)')
     .choices('x', [1, 2, 3])
     .default('x', cfg.cli.nServer)
     
-    .describe('simul','Forse download simulcast version instead of uncut')
-    .boolean('simul')
-    
-    .describe('a','Release group')
-    .default('a',cfg.cli.releaseGroup)
-    .describe('t','Filename: series title override')
-    .describe('ep','Filename: episode number override (ignored in batch mode)')
-    .describe('suffix','Filename: filename suffix override (first "SIZEp" will be raplaced with actual video size)')
-    .default('suffix',cfg.cli.fileSuffix)
-    
     .describe('nosubs','Skip download subtitles for Dub (if available)')
     .boolean('nosubs')
+    
+    // proxy
+    .describe('socks','Set ipv4 socks5 proxy')
+    .describe('socks-login','Set socks5 username')
+    .describe('socks-pass','Set socks5 password')
+    .describe('proxy','Set ipv4 http(s) proxy')
+    .describe('ssp','Don\'t use proxy for stream downloading')
+    .boolean('ssp')
     
     .describe('mp4','Mux into mp4')
     .boolean('mp4')
@@ -92,22 +100,18 @@ let argv = yargs
     .boolean('mks')
     .default('mks',cfg.cli.muxSubs)
     
+    .describe('a','Filenaming: Release group')
+    .default('a',cfg.cli.releaseGroup)
+    .describe('t','Filenaming: Series title override')
+    .describe('ep','Filenaming: Episode number override (ignored in batch mode)')
+    .describe('suffix','Filenaming: Filename suffix override (first "SIZEp" will be raplaced with actual video size)')
+    .default('suffix',cfg.cli.fileSuffix)
+
+    
+    // util
     .describe('nocleanup','move temporary files to trash folder instead of deleting')
     .boolean('nocleanup')
     .default('nocleanup',cfg.cli.noCleanUp)
-    
-    // login
-    .describe('mail','Your email')
-    .describe('pass','Your password')
-    
-    // proxy
-    .describe('socks','Set ipv4 socks5 proxy')
-    .describe('socks-login','Set socks5 username')
-    .describe('socks-pass','Set socks5 password')
-    
-    .describe('proxy','Set ipv4 http(s) proxy')
-    .describe('ssp','Don\'t use proxy for stream downloading')
-    .boolean('ssp')
     
     // help
     .describe('h','Show this help')
@@ -133,12 +137,6 @@ let fnTitle = '',
     tsDlPath = false,
     stDlPath = false,
     batchDL = false;
-
-// dirname to script dir
-cfg.bin.ffmpeg = path.join(cfg.bin.ffmpeg.replace(/^__dirname/,__dirname));
-cfg.bin.mkvmerge = path.join(cfg.bin.mkvmerge.replace(/^__dirname/,__dirname));
-cfg.dir.content = cfg.dir.content.replace(/^__dirname/,__dirname);
-cfg.dir.trash = cfg.dir.trash.replace(/^__dirname/,__dirname);
 
 // go to work folder
 try {
@@ -167,15 +165,15 @@ else{
 
 // auth
 async function auth(){
-    let authData = await getData(api_host+'/auth/login/',false,true,false,true);
+    let authData = await getData(api_host+`/auth/login/`,false,true,false,true);
     if(checkRes(authData)){return;}
     authData = JSON.parse(authData.res.body);
     if(authData.token){
-        console.log('[INFO] Authentication success, your token:',authData.token.slice(0,7)+'*'.repeat(33),'\n');
+        console.log(`[INFO] Authentication success, your token:`,authData.token.slice(0,7)+`*`.repeat(33),`\n`);
         fs.writeFileSync(tokenFile,yaml.stringify({"token":authData.token}));
     }
     else{
-        console.log('[ERROR]',authData.error,'\n');
+        console.log(`[ERROR]`,authData.error,`\n`);
         process.exit(1);
     }
 }
@@ -183,79 +181,114 @@ async function auth(){
 // search show
 async function searchShow(){
     let qs = {unique:true,limit:100,q:argv.search,offset:(argv.p-1)*1000};
-    let searchData = await getData(api_host+'/source/funimation/search/auto/',qs,true,true);
+    let searchData = await getData(api_host+`/source/funimation/search/auto/`,qs,true,true);
     if(checkRes(searchData)){return;}
     searchData = JSON.parse(searchData.res.body);
     if(searchData.items.hits){
         let shows = searchData.items.hits;
-        console.log('[INFO] Search Results:');
+        console.log(`[INFO] Search Results:`);
         for(let ssn in shows){
-            console.log('[#'+shows[ssn].id+'] '+shows[ssn].title+(shows[ssn].tx_date?' ('+shows[ssn].tx_date+')':''));
+            console.log(`[#${shows[ssn].id}] ${shows[ssn].title}` + (shows[ssn].tx_date?` (${shows[ssn].tx_date})`:``));
         }
     }
-    console.log('[INFO] Total shows found:',searchData.count,'\n');
+    console.log(`[INFO] Total shows found:`,searchData.count,`\n`);
 }
 
 // get show
 async function getShow(){
     // show main data
-    let showData = await getData(api_host+'/source/catalog/title/'+parseInt(argv.s,10),false,true,true);
+    let showData = await getData(api_host+`/source/catalog/title/`+parseInt(argv.s,10),false,true,true);
     if(checkRes(showData)){return;}
     // check errors
     showData = JSON.parse(showData.res.body);
     if(showData.status){
-        console.log('[ERROR] Error #'+showData.status+':',showData.data.errors[0].detail,'\n');
+        console.log(`[ERROR] Error #`+showData.status+`:`,showData.data.errors[0].detail,`\n`);
         process.exit(1);
     }
     else if(!showData.items || showData.items.length<1){
-        console.log('[ERROR] Show not found\n');
+        console.log(`[ERROR] Show not found\n`);
     }
     showData = showData.items[0];
-    console.log('[#'+showData.id+'] '+showData.title+' ('+showData.releaseYear+')');
+    console.log(`[#${showData.id}] ${showData.title} (${showData.releaseYear})`);
     // show episodes
     let qs = {limit:-1,sort:'order',sort_direction:'ASC',title_id:parseInt(argv.s,10)};
-    if(argv.alt){ qs.language = 'English'; }
-    let episodesData = await getData(api_host+'/funimation/episodes/',qs,true,true);
+    if(argv.alt){ qs.language = `English`; }
+    let episodesData = await getData(api_host+`/funimation/episodes/`,qs,true,true);
     if(checkRes(episodesData)){return;}
     let eps = JSON.parse(episodesData.res.body).items, fnSlug = [], is_selected = false;
     argv.e = typeof argv.e == 'number' || typeof argv.e == 'string' ? argv.e.toString() : '';
     argv.e = argv.e.match(',') ? argv.e.split(',') : [argv.e];
+    let epSelList = argv.e, epSelRanges = [], epSelEps = [];
+    epSelList = epSelList.map((e)=>{
+        if(e.match('-')){
+            e = e.split('-');
+            if( e[0].match(/^(?:[A-Z]|)\d+$/i) && e[1].match(/^\d+$/) ){
+                e[0] = e[0].replace(/^(?:([A-Z])|)(0+)/i,'$1');
+                let letter = e[0].match(/^([A-Z])\d+$/i) ? e[0].match(/^([A-Z])\d+$/i)[1].toUpperCase() : '';
+                e[0] = e[0].replace(/^[A-Z](\d+)$/i,'$1');
+                e[0] = parseInt(e[0]);
+                e[1] = parseInt(e[1]);
+                if(e[0] < e[1]){
+                    for(let i=e[0];i<e[1]+1;i++){
+                        epSelRanges.push(letter+i);
+                    }
+                    return '';
+                }
+                else{
+                    return (letter+e[0]);
+                }
+            }
+            else{
+                return '';
+            }
+        }
+        else if(e.match(/^(?:[A-Z]|)\d+$/i)){
+            return e.replace(/^(?:([A-Z])|)(0+)/i,'$1').toUpperCase();
+        }
+        else{
+            return '';
+        }
+    });
+    epSelList = [...new Set(epSelList.concat(epSelRanges))];
     // parse episodes list
     for(let e in eps){
         let showStrId = eps[e].ids.externalShowId;
         let epStrId = eps[e].ids.externalEpisodeId.replace(new RegExp('^'+showStrId),'');
         // select
-        if(argv.e.includes(epStrId.replace(/^0+/,''))){
+        if(epSelList.includes(epStrId.replace(/^(?:([A-Z])|)(0+)/,'$1'))){
             fnSlug.push({title:eps[e].item.titleSlug,episode:eps[e].item.episodeSlug});
+            epSelEps.push(epStrId);
             is_selected = true;
         }
         else{
             is_selected = false;
         }
         // console vars
-        let tx_snum = eps[e].item.seasonNum==1?'':' S'+eps[e].item.seasonNum;
-        let tx_type = eps[e].mediaCategory != 'episode' ? eps[e].mediaCategory : '';
-        let tx_enum = eps[e].item.episodeNum !== '' ? '#' + (eps[e].item.episodeNum < 10 ? '0'+eps[e].item.episodeNum : eps[e].item.episodeNum) : '#'+eps[e].item.episodeId;
-        let qua_str = eps[e].quality.height ? eps[e].quality.quality +''+ eps[e].quality.height : 'UNK';
-        let aud_str = eps[e].audio.length > 0 ? ', '+eps[e].audio.join(', ') : '';
-        let rtm_str = eps[e].item.runtime !== '' ? eps[e].item.runtime : '??:??';
+        let tx_snum = eps[e].item.seasonNum==1?``:` S`+eps[e].item.seasonNum;
+        let tx_type = eps[e].mediaCategory != `episode` ? eps[e].mediaCategory : ``;
+        let tx_enum = eps[e].item.episodeNum !== `` ?
+            `#` + (eps[e].item.episodeNum < 10 ? `0`+eps[e].item.episodeNum : eps[e].item.episodeNum) : `#`+eps[e].item.episodeId;
+        let qua_str = eps[e].quality.height ? eps[e].quality.quality + eps[e].quality.height : `UNK`;
+        let aud_str = eps[e].audio.length > 0 ? `, `+eps[e].audio.join(`, `) : ``;
+        let rtm_str = eps[e].item.runtime !== `` ? eps[e].item.runtime : `??:??`;
         // console string
         let episodeIdStr = epStrId;
-        let conOut  = '['+episodeIdStr+'] ';
-            conOut += eps[e].item.titleName+tx_snum + ' - ' +tx_type+tx_enum+ ' ' +eps[e].item.episodeName+ ' ';
-            conOut += '('+rtm_str+') ['+qua_str+aud_str+ ']';
-            conOut += is_selected ? ' (selected)' : '';
-            conOut += eps.length-1 == e ? '\n' : '';
+        let conOut  = `[${episodeIdStr}] `;
+            conOut += eps[e].item.titleName+tx_snum+` - `+tx_type+tx_enum+` `+eps[e].item.episodeName+` `;
+            conOut += `(${rtm_str}) [${qua_str+aud_str}]`;
+            conOut += is_selected ? ` (selected)` : ``;
+            conOut += eps.length-1 == e ? `\n` : ``;
         console.log(conOut);
     }
     if(fnSlug.length>1){
         batchDL = true;
     }
     if(fnSlug.length<1){
-        console.log('[INFO] Episodes not selected!\n');
+        console.log(`[INFO] Episodes not selected!\n`);
         process.exit();
     }
     else{
+        console.log(`[INFO] Selected Episodes: `+epSelEps.join(`, `)+`\n`);
         for(let fnEp=0;fnEp<fnSlug.length;fnEp++){
             await getEpisode(fnSlug[fnEp]);
         }
@@ -263,7 +296,7 @@ async function getShow(){
 }
 
 async function getEpisode(fnSlug){
-    let episodeData = await getData(api_host+'/source/catalog/episode/'+fnSlug.title+'/'+fnSlug.episode+'/',false,true,true);
+    let episodeData = await getData(api_host+`/source/catalog/episode/${fnSlug.title}/${fnSlug.episode}/`,false,true,true);
     if(checkRes(episodeData)){return;}
     let ep = JSON.parse(episodeData.res.body).items[0], streamId = 0;
     // build fn
@@ -280,7 +313,7 @@ async function getEpisode(fnSlug){
     };
     // end
     console.log(`[INFO] ${ep.parent.title} - S${(ep.parent.seasonNumber?ep.parent.seasonNumber:'?')}E${(ep.number?ep.number:'?')} - ${ep.title}`);
-    console.log('[INFO] Available audio tracks:');
+    console.log(`[INFO] Available audio tracks:`);
     // map medias
     let media = ep.media.map(function(m){
         if(m.mediaType=='experience'){
@@ -318,16 +351,16 @@ async function getEpisode(fnSlug){
         }
     }
     if(streamId<1){
-        console.log('[ERROR] Track not selected\n');
+        console.log(`[ERROR] Track not selected\n`);
         return;
     }
     else{
-        let streamData = await getData(api_host+'/source/catalog/video/'+streamId+'/signed',{"dinstid":"uuid"},true,true);
+        let streamData = await getData(api_host+`/source/catalog/video/${streamId}/signed`,{"dinstid":"uuid"},true,true);
         if(checkRes(streamData)){return;}
         streamData = JSON.parse(streamData.res.body);
         tsDlPath = false;
         if(streamData.errors){
-            console.log('[ERROR] Error #'+streamData.errors[0].code+':',streamData.errors[0].detail,'\n');
+            console.log(`[ERROR] Error #${streamData.errors[0].code}:`,streamData.errors[0].detail,`\n`);
             return;
         }
         else{
@@ -339,7 +372,7 @@ async function getEpisode(fnSlug){
             }
         }
         if(!tsDlPath){
-            console.log('[ERROR] Unknown error\n');
+            console.log(`[ERROR] Unknown error\n`);
             return;
         }
         else{
@@ -451,16 +484,16 @@ async function downloadStreams(){
     
     // download subtitles
     if(stDlPath){
-        console.log('[INFO] Downloading subtitles...');
+        console.log(`[INFO] Downloading subtitles...`);
         console.log(stDlPath);
         let subsSrc = await getData(stDlPath,false,true);
         if(!checkRes(subsSrc)){
             let srtData = ttml2srt(subsSrc.res.body);
-            fs.writeFileSync(fnOutput+'.srt',srtData);
-            console.log('[INFO] Subtitles downloaded!');
+            fs.writeFileSync(`${fnOutput}.srt`,srtData);
+            console.log(`[INFO] Subtitles downloaded!`);
         }
         else{
-            console.log('[ERROR] Failed to download subtitles!');
+            console.log(`[ERROR] Failed to download subtitles!`);
             argv.mks = false;
         }
     }
@@ -468,8 +501,17 @@ async function downloadStreams(){
     // add subs
     let addSubs = argv.mks && stDlPath ? true : false;
     
+    if( !argv.mp4 && !isFile(cfg.bin.mkvmerge) && !isFile(cfg.bin.mkvmerge+`.exe`) ){
+        console.log(`\n[WARN] MKVMerge not found, skip using this...`);
+        cfg.bin.mkvmerge = false;
+    }
+    if( !isFile(cfg.bin.ffmpeg) && !isFile(cfg.bin.ffmpeg+`.exe`) ){
+        console.log((cfg.bin.mkvmerge?`\n`:``)+`[WARN] FFmpeg not found, skip using this...`);
+        cfg.bin.ffmpeg = false;
+    }
+    
     // select muxer
-    if(!argv.mp4){
+    if(!argv.mp4 && cfg.bin.mkvmerge){
         // mux to mkv
         let mkvmux  = `-o "${fnOutput}.mkv" --disable-track-statistics-tags --engage no_variable_data `;
             mkvmux += `--track-name "0:${argv.a}" --language "1:${argv.sub?'jpn':'eng'}" --video-tracks 0 --audio-tracks 1 --no-subtitles --no-attachments `;
@@ -477,17 +519,24 @@ async function downloadStreams(){
             mkvmux += addSubs ? `--language 0:eng "${fnOutput}.srt" ` : ``;
         shlp.exec(`mkvmerge`,`"${cfg.bin.mkvmerge}"`,mkvmux);
     }
-    else{
-        let mp4mux = `-i "${fnOutput}.ts" `
-            mp4mux += addSubs ? `-i "${fnOutput}.srt" ` : ``;
-            mp4mux += `-map 0 -c:v copy -c:a copy `
-            mp4mux += addSubs ? `-c:s mov_text ` : ``;
-            mp4mux += `-metadata encoding_tool="no_variable_data" `;
-            mp4mux += `-metadata:s:v:0 title="[${argv.a}]" -metadata:s:a:0 language=${argv.sub?'jpn':'eng'} `;
-            mp4mux += addSubs ? `-metadata:s:s:0 language=eng ` : ``;
-            mp4mux += `"${fnOutput}.mp4"`;
+    else if(cfg.bin.ffmpeg){
+        let ffext = !argv.mp4 ? `mkv` : `mp4`;
+        let ffmux = `-i "${fnOutput}.ts" `
+            ffmux += addSubs ? `-i "${fnOutput}.srt" ` : ``;
+            ffmux += `-map 0 -c:v copy -c:a copy `
+            ffmux += addSubs ? `-map 1 ` : ``;
+            ffmux += addSubs && !argv.mp4 ? `-c:s srt ` : ``;
+            ffmux += addSubs &&  argv.mp4 ? `-c:s mov_text ` : ``;
+            ffmux += `-metadata encoding_tool="no_variable_data" `;
+            ffmux += `-metadata:s:v:0 title="[${argv.a}]" -metadata:s:a:0 language=${argv.sub?'jpn':'eng'} `;
+            ffmux += addSubs ? `-metadata:s:s:0 language=eng ` : ``;
+            ffmux += `"${fnOutput}.${ffext}"`;
         // mux to mkv
-        shlp.exec(`ffmpeg`,`"${cfg.bin.ffmpeg}"`,mp4mux);
+        shlp.exec(`ffmpeg`,`"${cfg.bin.ffmpeg}"`,ffmux);
+    }
+    else{
+        console.log(`\n[INFO] Done!\n`);
+        return;
     }
     if(argv.nocleanup){
         fs.renameSync(fnOutput+`.ts`, path.join(cfg.dir.trash,`/${fnOutput}.ts`));
@@ -501,7 +550,17 @@ async function downloadStreams(){
             fs.unlinkSync(fnOutput+`.srt`, path.join(cfg.dir.trash,`/${fnOutput}.srt`));
         }
     }
-    console.log('\n[INFO] Done!\n');
+    console.log(`\n[INFO] Done!\n`);
+}
+
+function isFile(file){
+    try{
+        const isFile = fs.statSync(file).isFile();
+        return isFile;
+    }
+    catch(e){
+        return false;
+    }
 }
 
 function checkRes(r){
@@ -543,7 +602,7 @@ function getData(url,qs,proxy,useToken,auth){
     }
     if(useToken && token){
         options.headers = {
-            Authorization: 'Token '+token
+            Authorization: `Token ${token}`
         };
     }
     if(options.qs && options.qs.dinstid){

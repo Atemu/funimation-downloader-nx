@@ -38,13 +38,13 @@ After installing NodeJS with NPM goto directory with `package.json` file and typ
 
 ### Download Video
 
-* `-s <i> -e <s>` sets the show id and episode ids (coma-separated)
-* `--simul` force select simulcast version instead of uncut version
-* `--alt` alternative episode listing (if available)
+* `-s <i> -e <s>` sets the show id and episode ids (comma-separated, hyphen-sequence)
 * `-q <i>` sets the video layer quality [1...10] (optional, 0 is max)
+* `--alt` alternative episode listing (if available)
 * `--sub` switch from English dub to Japanese dub with subtitles
-* `--nosubs` skip download subtitles for Dub (if available)
+* `--simul` force select simulcast version instead of uncut version
 * `-x` select server (1 is cloudfront.net, 2...3 is dlvr1.net)
+* `--nosubs` skip download subtitles for Dub (if available)
 
 ### Proxy
 
@@ -70,12 +70,14 @@ After installing NodeJS with NPM goto directory with `package.json` file and typ
 ### Utility
 
 * `--nocleanup` move unnecessary files to trash folder after completion instead of deleting
+* `-h`, `--help` show all options
 
 ## Filename Template
 
 [`release group`] `title` - `episode` [`suffix`].`extension`
 
-## Command Line Examples
+## CLI Examples
 
 * `node funi --search "My Hero"` search "My Hero" in title
 * `node funi -s 124389 -e 1,2,3` download episodes 1-3 from show with id 124389
+* `node funi -s 124389 -e 1-3,2-7,s1-2` download episodes 1-7 and "S"-episodes 1-2 from show with id 124389
