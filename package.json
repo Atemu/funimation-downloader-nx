@@ -1,6 +1,6 @@
 {
     "name": "funimation-downloader-nx",
-    "version": "3.2.8",
+    "version": "4.0.0-rc1",
     "description": "Download videos from Funimation via cli.",
     "keywords": [
         "download",
@@ -24,11 +24,12 @@
     "main": "funi.js",
     "dependencies": {
         "hls-download": "^1.4.0",
-        "m3u8-parser": "^4.2.0",
-        "m3u8-stream-list": "^1.1.0",
-        "request": "^2.87.0",
-        "sei-helper": "^2.0.0",
+        "m3u8-parsed": "^1.2.0",
+        "request": "^2.88.0",
+        "sei-helper": "^2.1.2",
         "socks5-https-client": "^1.2.1",
-        "yargs": "^11.0.0"
+        "ttml2srt": "^1.0.0",
+        "yaml": "^1.0.1",
+        "yargs": "^12.0.4"
     }
 }
