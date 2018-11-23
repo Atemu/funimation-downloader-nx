@@ -42,7 +42,7 @@ else{
 
 if(fs.existsSync(tokenFile)){
     token = yaml.parse(fs.readFileSync(tokenFile, 'utf8')).token;
-    console.log(`[INFO] Token:`, token.slice(0,8)+`*`.repeat(32),`\n`);
+    console.log(`[INFO] Token: %s%s\n`, token.slice(0,8),'*'.repeat(32));
 }
 else{
     console.log(`[INFO] Token not set!\n`);
@@ -106,7 +106,6 @@ let argv = yargs
     .describe('ep','Filenaming: Episode number override (ignored in batch mode)')
     .describe('suffix','Filenaming: Filename suffix override (first "SIZEp" will be raplaced with actual video size)')
     .default('suffix',cfg.cli.fileSuffix)
-
     
     // util
     .describe('nocleanup','move temporary files to trash folder instead of deleting')
@@ -143,7 +142,7 @@ try {
     fs.accessSync(cfg.dir.content, fs.R_OK | fs.W_OK)
 } catch (e) {
     console.log(e);
-    console.log(`[ERROR] `+e.messsage);
+    console.log(`[ERROR] %s`,e.messsage);
     process.exit();
 }
 process.chdir(cfg.dir.content);
@@ -165,11 +164,11 @@ else{
 
 // auth
 async function auth(){
-    let authData = await getData(api_host+`/auth/login/`,false,true,false,true);
+    let authData = await getData(`${api_host}/auth/login/`,false,true,false,true);
     if(checkRes(authData)){return;}
     authData = JSON.parse(authData.res.body);
     if(authData.token){
-        console.log(`[INFO] Authentication success, your token:`,authData.token.slice(0,7)+`*`.repeat(33),`\n`);
+        console.log(`[INFO] Authentication success, your token: %s%s\n`, authData.token.slice(0,8),'*'.repeat(32));
         fs.writeFileSync(tokenFile,yaml.stringify({"token":authData.token}));
     }
     else{
@@ -181,7 +180,7 @@ async function auth(){
 // search show
 async function searchShow(){
     let qs = {unique:true,limit:100,q:argv.search,offset:(argv.p-1)*1000};
-    let searchData = await getData(api_host+`/source/funimation/search/auto/`,qs,true,true);
+    let searchData = await getData(`${api_host}/source/funimation/search/auto/`,qs,true,true);
     if(checkRes(searchData)){return;}
     searchData = JSON.parse(searchData.res.body);
     if(searchData.items.hits){
@@ -191,29 +190,29 @@ async function searchShow(){
             console.log(`[#${shows[ssn].id}] ${shows[ssn].title}` + (shows[ssn].tx_date?` (${shows[ssn].tx_date})`:``));
         }
     }
-    console.log(`[INFO] Total shows found:`,searchData.count,`\n`);
+    console.log(`[INFO] Total shows found: %s\n`,searchData.count);
 }
 
 // get show
 async function getShow(){
     // show main data
-    let showData = await getData(api_host+`/source/catalog/title/`+parseInt(argv.s,10),false,true,true);
+    let showData = await getData(`${api_host}/source/catalog/title/`+parseInt(argv.s,10),false,true,true);
     if(checkRes(showData)){return;}
     // check errors
     showData = JSON.parse(showData.res.body);
     if(showData.status){
-        console.log(`[ERROR] Error #`+showData.status+`:`,showData.data.errors[0].detail,`\n`);
+        console.log(`[ERROR] Error #%d: %s\n`, showData.status, showData.data.errors[0].detail);
         process.exit(1);
     }
     else if(!showData.items || showData.items.length<1){
         console.log(`[ERROR] Show not found\n`);
     }
     showData = showData.items[0];
-    console.log(`[#${showData.id}] ${showData.title} (${showData.releaseYear})`);
+    console.log(`[#%s] %s (%s)`,showData.id,showData.title,showData.releaseYear);
     // show episodes
     let qs = {limit:-1,sort:'order',sort_direction:'ASC',title_id:parseInt(argv.s,10)};
     if(argv.alt){ qs.language = `English`; }
-    let episodesData = await getData(api_host+`/funimation/episodes/`,qs,true,true);
+    let episodesData = await getData(`${api_host}/funimation/episodes/`,qs,true,true);
     if(checkRes(episodesData)){return;}
     let eps = JSON.parse(episodesData.res.body).items, fnSlug = [], is_selected = false;
     argv.e = typeof argv.e == 'number' || typeof argv.e == 'string' ? argv.e.toString() : '';
@@ -264,20 +263,20 @@ async function getShow(){
             is_selected = false;
         }
         // console vars
-        let tx_snum = eps[e].item.seasonNum==1?``:` S`+eps[e].item.seasonNum;
-        let tx_type = eps[e].mediaCategory != `episode` ? eps[e].mediaCategory : ``;
-        let tx_enum = eps[e].item.episodeNum !== `` ?
-            `#` + (eps[e].item.episodeNum < 10 ? `0`+eps[e].item.episodeNum : eps[e].item.episodeNum) : `#`+eps[e].item.episodeId;
+        let tx_snum = eps[e].item.seasonNum==1?'':` S${eps[e].item.seasonNum}`;
+        let tx_type = eps[e].mediaCategory != 'episode' ? eps[e].mediaCategory : ``;
+        let tx_enum = eps[e].item.episodeNum !== '' ?
+            `#${(eps[e].item.episodeNum < 10 ? '0' : '')+eps[e].item.episodeNum}` : `#`+eps[e].item.episodeId;
         let qua_str = eps[e].quality.height ? eps[e].quality.quality + eps[e].quality.height : `UNK`;
-        let aud_str = eps[e].audio.length > 0 ? `, `+eps[e].audio.join(`, `) : ``;
-        let rtm_str = eps[e].item.runtime !== `` ? eps[e].item.runtime : `??:??`;
+        let aud_str = eps[e].audio.length > 0 ? `, ${eps[e].audio.join(', ')}` : '';
+        let rtm_str = eps[e].item.runtime !== '' ? eps[e].item.runtime : '??:??';
         // console string
         let episodeIdStr = epStrId;
         let conOut  = `[${episodeIdStr}] `;
-            conOut += eps[e].item.titleName+tx_snum+` - `+tx_type+tx_enum+` `+eps[e].item.episodeName+` `;
+            conOut += `${eps[e].item.titleName+tx_snum} - ${tx_type+tx_enum} ${eps[e].item.episodeName} `;
             conOut += `(${rtm_str}) [${qua_str+aud_str}]`;
-            conOut += is_selected ? ` (selected)` : ``;
-            conOut += eps.length-1 == e ? `\n` : ``;
+            conOut += is_selected ? ' (selected)' : '';
+            conOut += eps.length-1 == e ? '\n' : '';
         console.log(conOut);
     }
     if(fnSlug.length>1){
@@ -288,7 +287,7 @@ async function getShow(){
         process.exit();
     }
     else{
-        console.log(`[INFO] Selected Episodes: `+epSelEps.join(`, `)+`\n`);
+        console.log(`[INFO] Selected Episodes: %s\n`,epSelEps.join(', '));
         for(let fnEp=0;fnEp<fnSlug.length;fnEp++){
             await getEpisode(fnSlug[fnEp]);
         }
@@ -296,7 +295,7 @@ async function getShow(){
 }
 
 async function getEpisode(fnSlug){
-    let episodeData = await getData(api_host+`/source/catalog/episode/${fnSlug.title}/${fnSlug.episode}/`,false,true,true);
+    let episodeData = await getData(`${api_host}/source/catalog/episode/${fnSlug.title}/${fnSlug.episode}/`,false,true,true);
     if(checkRes(episodeData)){return;}
     let ep = JSON.parse(episodeData.res.body).items[0], streamId = 0;
     // build fn
@@ -312,7 +311,13 @@ async function getEpisode(fnSlug){
         English: false
     };
     // end
-    console.log(`[INFO] ${ep.parent.title} - S${(ep.parent.seasonNumber?ep.parent.seasonNumber:'?')}E${(ep.number?ep.number:'?')} - ${ep.title}`);
+    console.log(
+        `[INFO] %s - S%sE%s - %s`,
+        ep.parent.title,
+        (ep.parent.seasonNumber?ep.parent.seasonNumber:'?'),
+        (ep.number?ep.number:'?'),
+        ep.title
+    );
     console.log(`[INFO] Available audio tracks:`);
     // map medias
     let media = ep.media.map(function(m){
@@ -347,7 +352,7 @@ async function getEpisode(fnSlug){
                 stDlPath = m.subtitles;
                 selected = true;
             }
-            console.log(`[#${m.id}] ${dub_type} [${m.version}]`+(selected?` (selected)`:``));
+            console.log(`[#%s] %s [%s] %s`,m.id,dub_type,m.version,(selected?' (selected)':''));
         }
     }
     if(streamId<1){
@@ -355,12 +360,12 @@ async function getEpisode(fnSlug){
         return;
     }
     else{
-        let streamData = await getData(api_host+`/source/catalog/video/${streamId}/signed`,{"dinstid":"uuid"},true,true);
+        let streamData = await getData(`${api_host}/source/catalog/video/${streamId}/signed`,{"dinstid":"uuid"},true,true);
         if(checkRes(streamData)){return;}
         streamData = JSON.parse(streamData.res.body);
         tsDlPath = false;
         if(streamData.errors){
-            console.log(`[ERROR] Error #${streamData.errors[0].code}:`,streamData.errors[0].detail,`\n`);
+            console.log(`[ERROR] Error #%s: %s\n`,streamData.errors[0].code,streamData.errors[0].detail);
             return;
         }
         else{
@@ -440,12 +445,12 @@ async function downloadStreams(){
         console.log(`[INFO] Selected layer: ${argv.q}\n\tAvailable qualities:\n\t\t${plQualityStr.join('\n\t\t')}`);
         fnSuffix = argv.suffix.replace('SIZEp',plQuality[argv.q].q);
         console.log(`[INFO] Selected server: ` + ( argv.x < 1 ? `1` : ( argv.x > maxServers-1 ? maxServers : argv.x+1 ) ) + ` / Total servers available: ` + maxServers );
-        console.log(`[INFO] Stream URL: `+vidUrl);
-        fnOutput = shlp.cleanupFilename('['+argv.a+'] ' + fnTitle + ' - ' + fnEpNum + ' ['+ fnSuffix +']');
+        console.log(`[INFO] Stream URL:`,vidUrl);
+        fnOutput = shlp.cleanupFilename(`[${argv.a}] ${fnTitle} - ${fnEpNum} [${fnSuffix}]`);
         console.log(`[INFO] Output filename: ${fnOutput}`);
     }
     else{
-        console.log(`[INFO] Available qualities: ${plQualityStr.join(', ')}`);
+        console.log(`[INFO] Available qualities:`,plQualityStr.join('\n\t'));
         console.log(`[ERROR] Layer not selected\n`);
         return;
     }
@@ -459,14 +464,14 @@ async function downloadStreams(){
     
     let proxy;
     if(argv.socks && !argv.ssp){
-        proxy = { "ip": argv.socks, "type": "socks" };
+        proxy = { "host": argv.socks, "type": "socks" };
         if(argv['socks-login'] && argv['socks-pass']){
             proxy['socks-login'] = argv['socks-login'];
             proxy['socks-pass'] = argv['socks-pass'];
         }
     }
     else if(argv.proxy && !argv.ssp){
-        proxy = { "ip": argv.proxy, "type": "http" };
+        proxy = { "host": argv.proxy, "type": "http" };
     }
     let dldata = await streamdl({
         fn: fnOutput,
@@ -565,17 +570,17 @@ function isFile(file){
 
 function checkRes(r){
     if(r.err){
-        console.log(`[ERROR] Error: ${r.err}`);
+        console.log(`[ERROR] Error: %s`,r.err);
         if(r.res && r.res.body){
-            console.log(`[ERROR] Body:\n${r.res.body}\n`);
+            console.log(`[ERROR] Body:\n%s\n`,r.res.body);
         }
         else{
-            console.log(`[ERROR] Additional info:\n${JSON.stringify(r.res,null,'\t')}\n`);
+            console.log(`[ERROR] Additional info:\n%s\n`,JSON.stringify(r.res,null,'\t'));
         }
         return true;
     }
     if(r.res && r.res.body && r.res.body.match(/^<!doctype/i) || r.res && r.res.body && r.res.body.match(/<html/)){
-        console.log(`[ERROR] Error: ${r.err}, body:\n${r.res.body}\n`);
+        console.log(`[ERROR] Error: %s, body:\n%s\n`,(r.err?r.err:r.res.statusCode),r.res.body);
         return true;
     }
     return false;
