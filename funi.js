@@ -104,7 +104,7 @@ let argv = yargs
     .default('a',cfg.cli.releaseGroup)
     .describe('t','Filenaming: Series title override')
     .describe('ep','Filenaming: Episode number override (ignored in batch mode)')
-    .describe('suffix','Filenaming: Filename suffix override (first "SIZEp" will be raplaced with actual video size)')
+    .describe('suffix','Filenaming: Filename suffix override (first "SIZEp" will be replaced with actual video size)')
     .default('suffix',cfg.cli.fileSuffix)
     
     // util
