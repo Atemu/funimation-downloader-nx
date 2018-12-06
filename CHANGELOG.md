@@ -21,7 +21,7 @@
 ### 4.0.0 Beta 1 (2018/11/10)
 - Rearrange folders structure
 - Configuration changed to yaml format
-- Muxing changed to MPV by default
+- Muxing changed to MKV by default
 - tsMuxeR+mp4box replaced with FFMPEG
 - Updated commands help and readme
 - Fixed typos and duplicate options
