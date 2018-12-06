@@ -318,41 +318,46 @@ async function getEpisode(fnSlug){
         (ep.number?ep.number:'?'),
         ep.title
     );
-    console.log(`[INFO] Available audio tracks:`);
+    console.log(`[INFO] Available streams (Non-Encrypted):`);
     // map medias
     let media = ep.media.map(function(m){
         if(m.mediaType=='experience'){
             if(m.version.match(/uncut/i)){
                 uncut[m.language] = true;
             }
-            return { 
-                id: m.id, 
+            return {
+                id: m.id,
                 language: m.language,
                 version: m.version,
-                subtitles: getSubsUrl(m.mediaChildren)
+                type: m.experienceType,
+                subtitles: getSubsUrl(m.mediaChildren),
             };
         }
         else{
-            return { id: 0 };
+            return { id: 0, type: '' };
         }
     });
     // select
+    media = media.reverse();
     for(let m of media){
         let selected = false;
-        if(m.id>0){
+        if(m.id > 0 && m.type == 'Non-Encrypted'){
             let dub_type = m.language;
-            let selUncut = !argv.simul && uncut[dub_type] && m.version.match(/uncut/i) ? true : (!uncut[dub_type] || argv.simul && m.version.match(/simulcast/i) ? true : false);
+            let selUncut = !argv.simul && uncut[dub_type] && m.version.match(/uncut/i) 
+                ? true 
+                : (!uncut[dub_type] || argv.simul && m.version.match(/simulcast/i) ? true : false);
             if(dub_type == 'Japanese' && argv.sub && selUncut){
                 streamId = m.id;
                 stDlPath = m.subtitles;
                 selected = true;
             }
-            else if(dub_type == 'English' && !argv.sub && selUncut ){
+            else if(dub_type == 'English' && !argv.sub && selUncut){
                 streamId = m.id;
                 stDlPath = m.subtitles;
                 selected = true;
+
             }
-            console.log(`[#%s] %s [%s] %s`,m.id,dub_type,m.version,(selected?' (selected)':''));
+            console.log(`[#${m.id}] ${dub_type} [${m.version}]`,(selected?'(selected)':''));
         }
     }
     if(streamId<1){

@@ -23,7 +23,7 @@ To change these paths you need to edit `config.main.yml` in `./modules/` directo
 
 ### Node Modules
 
-After installing NodeJS with NPM goto directory with `package.json` file and type: `npm i`.
+After installing NodeJS with NPM go to directory with `package.json` file and type: `npm i`.
 * [check dependencies](https://david-dm.org/seiya-dev/funimation-downloader-nx)
 
 ## CLI Options
