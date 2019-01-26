@@ -185,7 +185,7 @@ async function searchShow(){
     let searchData = await getData(`${api_host}/source/funimation/search/auto/`,qs,true,true);
     if(checkRes(searchData)){return;}
     searchData = JSON.parse(searchData.res.body);
-    if(searchData.items.hits){
+    if(searchData.items && searchData.items.hits){
         let shows = searchData.items.hits;
         console.log(`[INFO] Search Results:`);
         for(let ssn in shows){

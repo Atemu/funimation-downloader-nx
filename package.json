@@ -23,13 +23,13 @@
     "license": "MIT",
     "main": "funi.js",
     "dependencies": {
-        "hls-download": "^1.5.2",
+        "hls-download": "^1.7.1",
         "m3u8-parsed": "^1.2.0",
         "request": "^2.88.0",
-        "sei-helper": "^2.1.2",
+        "sei-helper": "^3.0.4",
         "socks5-https-client": "^1.2.1",
-        "ttml2srt": "^1.0.0",
-        "yaml": "^1.0.2",
+        "ttml2srt": "^1.1.0",
+        "yaml": "^1.2.1",
         "yargs": "^12.0.5"
     }
 }

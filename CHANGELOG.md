@@ -1,5 +1,9 @@
 ## Change Log
 
+### 4.0.4 (2019/01/26)
+- Fix search when shows not found
+- Update modules
+
 ### 4.0.3 (2018/12/06)
 - Select only non-encrypted (HLS) streams, encrypted streams is MPEG-DASH
 
