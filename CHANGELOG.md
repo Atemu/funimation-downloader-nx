@@ -1,5 +1,8 @@
 ## Change Log
 
+### 4.0.5 (2019/02/09)
+- Fix downloading shows with autoselect max quality
+
 ### 4.0.4 (2019/01/26)
 - Fix search when shows not found
 - Update modules

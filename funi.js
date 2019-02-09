@@ -441,7 +441,7 @@ async function downloadStreams(){
     
     // select quality and server
     argv.x = argv.x - 1;
-    argv.q = argv.q < 1 && argv.q > pl_max ? pl_max : argv.q;
+    argv.q = argv.q < 1 || argv.q > pl_max ? pl_max : argv.q;
     let maxServers = plQualityAlt[argv.q].length + 1;
     if(argv.x > 0){
         plQuality[argv.q] = argv.x > maxServers-1 ? plQualityAlt[argv.q][0] : plQualityAlt[argv.q][argv.x-1];
