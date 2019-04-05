@@ -30,7 +30,7 @@ After installing NodeJS with NPM go to directory with `package.json` file and ty
 
 ### Authentication
 
-* `--user <s> --pass <s>` sets the username or email and password.
+* `--login` enter login mode
 
 ### Get Show ID
 

@@ -1,5 +1,9 @@
 ## Change Log
 
+### 4.1.0 (2019/04/05)
+- CLI options for login moved to CUI
+- Removed showing set token at startup
+
 ### 4.0.5 (2019/02/09)
 - Fix downloading shows with autoselect max quality
 

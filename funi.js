@@ -44,7 +44,7 @@ else{
 
 if(fs.existsSync(tokenFile)){
     token = yaml.parse(fs.readFileSync(tokenFile, 'utf8')).token;
-    console.log(`[INFO] Token: %s%s\n`, token.slice(0,8),'*'.repeat(32));
+    // console.log(`[INFO] Token: %s%s\n`, token.slice(0,8), '*'.repeat(32));
 }
 else{
     console.log(`[INFO] Token not set!\n`);
@@ -57,8 +57,7 @@ let argv = yargs
     .help(false).version(false)
     
     // login
-    .describe('user','Your username or email')
-    .describe('pass','Your password')
+    .describe('login','Enter login mode')
     
     // search
     .describe('search','Sets the show title for search')
@@ -118,8 +117,9 @@ let argv = yargs
     .describe('h','Show this help')
     .alias('h','help')
     .boolean('h')
-    .version(false)
     
+    .version(false)
+    .help(false)
     .argv;
 
 // check page
@@ -150,7 +150,7 @@ try {
 process.chdir(cfg.dir.content);
 
 // select mode
-if(argv.user && argv.pass){
+if(argv.login){
     auth();
 }
 else if(argv.search){
@@ -166,7 +166,10 @@ else{
 
 // auth
 async function auth(){
-    let authData = await getData(`${api_host}/auth/login/`,false,true,false,true);
+    let authArgv = {};
+    authArgv.user = await shlp.question(`LOGIN/EMAIL`);
+    authArgv.pass = await shlp.question(`PASSWORD   `);
+    let authData = await getData(`${api_host}/auth/login/`,false,true,false,authArgv);
     if(checkRes(authData)){return;}
     authData = JSON.parse(authData.res.body);
     if(authData.token){
@@ -598,18 +601,18 @@ function log(data){
 }
 
 // get data from url
-function getData(url,qs,proxy,useToken,auth){
+function getData(url,qs,proxy,useToken,authArgv){
     let options = {};
     // request parameters
     options.url = url;
     if(qs){
         options.qs = qs;
     }
-    if(auth){
+    if(authArgv){
         options.method = 'POST';
         options.formData = {
-            username: argv.user,
-            password: argv.pass
+            username: authArgv.user,
+            password: authArgv.pass
         };
     }
     if(useToken && token){
