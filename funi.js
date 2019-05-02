@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 
 // modules build-in
-const path = require('path');
 const fs = require('fs');
+const path = require('path');
+const url = require('url');
 
 // package json
 const packageJson = require(path.join(__dirname,'package.json'));
@@ -11,17 +12,24 @@ const packageJson = require(path.join(__dirname,'package.json'));
 console.log(`\n=== Funimation Downloader NX ${packageJson.version} ===\n`);
 const api_host = `https://prod-api-funimationnow.dadcdigital.com/api`;
 
+// request
+const got = require('got').extend({
+    headers: { 'user-agent': 'Mozilla/5.0 (Windows NT 10.0; WOW64; rv:65.0) Gecko/20100101 Firefox/65.0' },
+});
+
+// proxy
+const ProxyAgent = require('proxy-agent');
+
 // modules extra
 const yaml = require('yaml');
 const shlp = require('sei-helper');
 const yargs = require('yargs');
-const request = require('request');
-const agent = require('socks5-https-client/lib/Agent');
-const { ttml2srt } = require('ttml2srt');
+const FormData = require('form-data');
 
-// m3u8
+// m3u8 and ttml
 const m3u8 = require('m3u8-parsed');
 const streamdl = require('hls-download');
+const { ttml2srt } = require('ttml2srt');
 
 // config
 const configFile = path.join(__dirname,'/modules/config.main.yml');
@@ -43,8 +51,15 @@ else{
 }
 
 if(fs.existsSync(tokenFile)){
-    token = yaml.parse(fs.readFileSync(tokenFile, 'utf8')).token;
-    // console.log(`[INFO] Token: %s%s\n`, token.slice(0,8), '*'.repeat(32));
+    token = yaml.parse(fs.readFileSync(tokenFile, 'utf8'));
+    if(token && token.token){
+        token = token.token;
+        // console.log(`[INFO] Token: %s%s\n`, token.slice(0,8), '*'.repeat(32));
+    }
+    else{
+        token = false;
+        console.log(`[INFO] Token not set!\n`);
+    }
 }
 else{
     console.log(`[INFO] Token not set!\n`);
@@ -56,8 +71,8 @@ let argv = yargs
     .usage('Usage: $0 [options]')
     .help(false).version(false)
     
-    // login
-    .describe('login','Enter login mode')
+    // auth
+    .describe('auth','Enter auth mode')
     
     // search
     .describe('search','Sets the show title for search')
@@ -87,11 +102,9 @@ let argv = yargs
     .boolean('nosubs')
     
     // proxy
-    .describe('socks','Set ipv4 socks5 proxy')
-    .describe('socks-login','Set socks5 username')
-    .describe('socks-pass','Set socks5 password')
-    .describe('proxy','Set ipv4 http(s) proxy')
-    .describe('ssp','Don\'t use proxy for stream downloading')
+    .describe('proxy','http(s)/socks proxy WHATWG url (ex. https://myproxyhost:1080/)')
+    .describe('proxy-auth','Colon-separated username and password for proxy')
+    .describe('ssp','Ignore proxy settings for stream downloading')
     .boolean('ssp')
     
     .describe('mp4','Mux into mp4')
@@ -142,7 +155,8 @@ let fnTitle = '',
 // go to work folder
 try {
     fs.accessSync(cfg.dir.content, fs.R_OK | fs.W_OK)
-} catch (e) {
+}
+catch (e) {
     console.log(e);
     console.log(`[ERROR] %s`,e.messsage);
     process.exit();
@@ -150,7 +164,7 @@ try {
 process.chdir(cfg.dir.content);
 
 // select mode
-if(argv.login){
+if(argv.auth){
     auth();
 }
 else if(argv.search){
@@ -166,28 +180,44 @@ else{
 
 // auth
 async function auth(){
-    let authArgv = {};
-    authArgv.user = await shlp.question(`LOGIN/EMAIL`);
-    authArgv.pass = await shlp.question(`PASSWORD   `);
-    let authData = await getData(`${api_host}/auth/login/`,false,true,false,authArgv);
-    if(checkRes(authData)){return;}
-    authData = JSON.parse(authData.res.body);
-    if(authData.token){
-        console.log(`[INFO] Authentication success, your token: %s%s\n`, authData.token.slice(0,8),'*'.repeat(32));
-        fs.writeFileSync(tokenFile,yaml.stringify({"token":authData.token}));
-    }
-    else{
-        console.log(`[ERROR]`,authData.error,`\n`);
-        process.exit(1);
+    let authOpts = {};
+    authOpts.user = await shlp.question(`[Q] LOGIN/EMAIL`);
+    authOpts.pass = await shlp.question(`[Q] PASSWORD   `);
+    let authData =  await getData({
+        baseUrl: api_host,
+        url: `/auth/login/`,
+        useProxy: true,
+        auth: authOpts,
+    });
+    if(authData.ok){
+        authData = JSON.parse(authData.res.body);
+        if(authData.token){
+            console.log(`[INFO] Authentication success, your token: %s%s\n`, authData.token.slice(0,8),'*'.repeat(32));
+            fs.writeFileSync(tokenFile,yaml.stringify({"token":authData.token}));
+        }
+        else if(authData.error){
+            console.log(`[ERROR]`,authData.error,`\n`);
+            process.exit(1);
+        }
     }
 }
 
 // search show
 async function searchShow(){
-    let qs = {unique:true,limit:100,q:argv.search,offset:(argv.p-1)*1000};
-    let searchData = await getData(`${api_host}/source/funimation/search/auto/`,qs,true,true);
-    if(checkRes(searchData)){return;}
+    let qs = {unique: true, limit: 100, q: argv.search, offset: (argv.p-1)*1000 };
+    let searchData = await getData({
+        baseUrl: api_host,
+        url: `/source/funimation/search/auto/`,
+        querystring: qs,
+        useToken: true,
+        useProxy: true,
+    });
+    if(!searchData.ok){return;}
     searchData = JSON.parse(searchData.res.body);
+    if(searchData.detail){
+        console.log(`[ERROR] ${searchData.detail}`);
+        return;
+    }
     if(searchData.items && searchData.items.hits){
         let shows = searchData.items.hits;
         console.log(`[INFO] Search Results:`);
@@ -201,9 +231,14 @@ async function searchShow(){
 // get show
 async function getShow(){
     // show main data
-    let showData = await getData(`${api_host}/source/catalog/title/`+parseInt(argv.s,10),false,true,true);
-    if(checkRes(showData)){return;}
+    let showData = await getData({
+        baseUrl: api_host,
+        url: `/source/catalog/title/${parseInt(argv.s,10)}`,
+        useToken: true,
+        useProxy: true,
+    });
     // check errors
+    if(!showData.ok){return;}
     showData = JSON.parse(showData.res.body);
     if(showData.status){
         console.log(`[ERROR] Error #%d: %s\n`, showData.status, showData.data.errors[0].detail);
@@ -211,14 +246,21 @@ async function getShow(){
     }
     else if(!showData.items || showData.items.length<1){
         console.log(`[ERROR] Show not found\n`);
+        process.exit(0);
     }
     showData = showData.items[0];
     console.log(`[#%s] %s (%s)`,showData.id,showData.title,showData.releaseYear);
     // show episodes
-    let qs = {limit:-1,sort:'order',sort_direction:'ASC',title_id:parseInt(argv.s,10)};
+    let qs = { limit: -1, sort: 'order', sort_direction: 'ASC', title_id: parseInt(argv.s,10) };
     if(argv.alt){ qs.language = `English`; }
-    let episodesData = await getData(`${api_host}/funimation/episodes/`,qs,true,true);
-    if(checkRes(episodesData)){return;}
+    let episodesData = await getData({
+        baseUrl: api_host,
+        url: `/funimation/episodes/`,
+        querystring: qs,
+        useToken: true,
+        useProxy: true,
+    });
+    if(!episodesData.ok){return;}
     let eps = JSON.parse(episodesData.res.body).items, fnSlug = [], is_selected = false;
     argv.e = typeof argv.e == 'number' || typeof argv.e == 'string' ? argv.e.toString() : '';
     argv.e = argv.e.match(',') ? argv.e.split(',') : [argv.e];
@@ -300,8 +342,13 @@ async function getShow(){
 }
 
 async function getEpisode(fnSlug){
-    let episodeData = await getData(`${api_host}/source/catalog/episode/${fnSlug.title}/${fnSlug.episode}/`,false,true,true);
-    if(checkRes(episodeData)){return;}
+    let episodeData = await getData({
+        baseUrl: api_host,
+        url: `/source/catalog/episode/${fnSlug.title}/${fnSlug.episode}/`,
+        useToken: true,
+        useProxy: true,
+    });
+    if(!episodeData.ok){return;}
     let ep = JSON.parse(episodeData.res.body).items[0], streamId = 0;
     // build fn
     fnTitle = argv.t ? argv.t : ep.parent.title;
@@ -360,7 +407,6 @@ async function getEpisode(fnSlug){
                 streamId = m.id;
                 stDlPath = m.subtitles;
                 selected = true;
-
             }
             console.log(`[#${m.id}] ${dub_type} [${m.version}]`,(selected?'(selected)':''));
         }
@@ -370,8 +416,14 @@ async function getEpisode(fnSlug){
         return;
     }
     else{
-        let streamData = await getData(`${api_host}/source/catalog/video/${streamId}/signed`,{"dinstid":"uuid"},true,true);
-        if(checkRes(streamData)){return;}
+        let streamData = await getData({
+            baseUrl: api_host,
+            url: `/source/catalog/video/${streamId}/signed`,
+            useToken: true,
+            useProxy: true,
+            dinstid: 'uuid',
+        });
+        if(!streamData.ok){return;}
         streamData = JSON.parse(streamData.res.body);
         tsDlPath = false;
         if(streamData.errors){
@@ -413,8 +465,11 @@ function getSubsUrl(m){
 async function downloadStreams(){
     
     // req playlist
-    let plQualityReq = await getData(tsDlPath);
-    if(checkRes(plQualityReq)){return;}
+    let plQualityReq = await getData({
+        url: tsDlPath,
+        useProxy: (argv.ssp ? false : true),
+    });
+    if(!plQualityReq.ok){return;}
     let plQualityLinkList = m3u8(plQualityReq.res.body);
     
     // build
@@ -466,28 +521,28 @@ async function downloadStreams(){
     }
     
     // download video
-    let reqVid = await getData(vidUrl,false,true);
-    if(checkRes(reqVid)){return;}
+    let reqVid = await getData({
+        url: vidUrl,
+        useProxy: (argv.ssp ? false : true),
+    });
+    if(!reqVid.ok){return;}
     
     let chunkList = m3u8(reqVid.res.body);
     chunkList.baseUrl = vidUrl.split('/').slice(0, -1).join('/')+'/';
     
-    let proxy;
-    if(argv.socks && !argv.ssp){
-        proxy = { "host": argv.socks, "type": "socks" };
-        if(argv['socks-login'] && argv['socks-pass']){
-            proxy['socks-login'] = argv['socks-login'];
-            proxy['socks-pass'] = argv['socks-pass'];
+    let proxyHLS;
+    if(argv.proxy && !argv.ssp){
+        try{
+            proxyHLS.url = buildProxyUrl(argv.proxy,argv['proxy-auth']);
         }
-    }
-    else if(argv.proxy && !argv.ssp){
-        proxy = { "host": argv.proxy, "type": "http" };
+        catch(e){}
     }
     let dldata = await streamdl({
         fn: fnOutput,
         m3u8json: chunkList,
         baseurl: chunkList.baseUrl,
-        proxy: (proxy?proxy:false)
+        pcount: 10,
+        proxy: (proxyHLS?proxyHLS:false)
     });
     if(!dldata.ok){
         console.log(`[ERROR] ${dldata.err}\n`);
@@ -501,8 +556,11 @@ async function downloadStreams(){
     if(stDlPath){
         console.log(`[INFO] Downloading subtitles...`);
         console.log(stDlPath);
-        let subsSrc = await getData(stDlPath,false,true);
-        if(!checkRes(subsSrc)){
+        let subsSrc = await getData({
+            url: stDlPath,
+            useProxy: true,
+        });
+        if(subsSrc.ok){
             let srtData = ttml2srt(subsSrc.res.body);
             fs.writeFileSync(`${fnOutput}.srt`,srtData);
             console.log(`[INFO] Subtitles downloaded!`);
@@ -578,86 +636,80 @@ function isFile(file){
     }
 }
 
-function checkRes(r){
-    if(r.err){
-        console.log(`[ERROR] Error: %s`,r.err);
-        if(r.res && r.res.body){
-            console.log(`[ERROR] Body:\n%s\n`,r.res.body);
+// get data from url
+async function getData(options){
+    let gOptions = { url: options.url, headers: {} };
+    if(options.baseUrl){
+        gOptions.baseUrl = options.baseUrl;
+    }
+    if(options.querystring){
+        gOptions.url += `?${new URLSearchParams(options.querystring).toString()}`;
+    }
+    if(options.auth){
+        gOptions.method = 'POST';
+        gOptions.body = new FormData();
+        gOptions.body.append('username', options.auth.user);
+        gOptions.body.append('password', options.auth.pass);
+    }
+    if(options.useToken && token){
+        gOptions.headers.Authorization = `Token ${token}`;
+    }
+    if(options.dinstid){
+        gOptions.headers.devicetype = 'Android Phone';
+    }
+    if(options.useProxy && argv.proxy){
+        try{
+            let proxyUrl = buildProxyUrl(argv.proxy,argv['proxy-auth']);
+            gOptions.agent = new ProxyAgent(proxyUrl);
+            gOptions.timeout = 10000;
+        }
+        catch(e){
+            console.log(`\n[WARN] Not valid proxy URL${e.input?' ('+e.input+')':''}!`);
+            console.log(`[WARN] Skiping...`);
+        }
+    }
+    try {
+        let res = await got(gOptions);
+        return {
+            ok: true,
+            res,
+        };
+    }
+    catch(error){
+        if(error.statusCode && error.statusMessage){
+            if(error.body.match(/^\{/)){
+                let res = error;
+                return {
+                    ok: true,
+                    res,
+                };
+            }
+            else{
+                console.log(`\n[ERROR] ${error.name} ${error.statusCode}: ${error.statusMessage}\n`);
+            }
         }
         else{
-            console.log(`[ERROR] Additional info:\n%s\n`,JSON.stringify(r.res,null,'\t'));
+            console.log(`\n[ERROR] ${error.name}: ${error.code}\n`);
         }
-        return true;
+        return {
+            ok: false,
+            error,
+        };
     }
-    if(r.res && r.res.body && r.res.body.match(/^<!doctype/i) || r.res && r.res.body && r.res.body.match(/<html/)){
-        console.log(`[ERROR] Error: %s, body:\n%s\n`,(r.err?r.err:r.res.statusCode),r.res.body);
-        return true;
-    }
-    return false;
 }
-
-function log(data){
-    console.log(JSON.stringify(data,null,'\t'));
-}
-
-// get data from url
-function getData(url,qs,proxy,useToken,authArgv){
-    let options = {};
-    // request parameters
-    options.url = url;
-    if(qs){
-        options.qs = qs;
+function buildProxyUrl(proxyBaseUrl,proxyAuth){
+    let proxyCfg = new URL(proxyBaseUrl);
+    if(!proxyCfg.hostname || !proxyCfg.port){
+        throw new Error();
     }
-    if(authArgv){
-        options.method = 'POST';
-        options.formData = {
-            username: authArgv.user,
-            password: authArgv.pass
-        };
+    if(proxyAuth && proxyAuth.match(':')){
+        proxyCfg.auth = proxyAuth;
     }
-    if(useToken && token){
-        options.headers = {
-            Authorization: `Token ${token}`
-        };
-    }
-    if(options.qs && options.qs.dinstid){
-        if(!options.headers){
-            options.headers = {};
-        }
-        options.headers.devicetype = 'Android Phone';
-        delete options.qs;
-    }
-    if(proxy && argv.socks){
-        options.agentClass = agent;
-        let agentOptions = {
-            socksHost: argv.socks.split(':')[0],
-            socksPort: argv.socks.split(':')[1]
-        };
-        if(argv['socks-login'] && argv['socks-pass']){
-            agentOptions.socksUsername = argv['socks-login'];
-            agentOptions.socksPassword = argv['socks-pass'];
-        }
-        options.agentOptions = agentOptions;
-        options.timeout = 10000;
-    }
-    else if(proxy && argv.proxy){
-        options.proxy = 'http://'+argv.proxy;
-        options.timeout = 10000;
-    }
-    // do request
-    return new Promise((resolve) => {
-        request(options, (err, res) => {
-            if (err){
-                res = err;
-                resolve({ "err": "0", res });
-            }
-            if(auth && res.statusCode == 401){
-                resolve({res});
-            }
-            if (res.statusCode != 200 && res.statusCode != 403) {
-                resolve({ "err": res.statusCode, res });
-            }
-            resolve({res});
-        });
+    return url.format({
+        protocol: proxyCfg.protocol,
+        slashes: true,
+        auth: proxyCfg.auth,
+        hostname: proxyCfg.hostname,
+        port: proxyCfg.port,
     });
 }
