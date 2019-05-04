@@ -1,5 +1,8 @@
 ## Change Log
 
+### 4.2.1 (2019/05/04)
+- filter dublicate urls for cloudfront.net
+
 ### 4.2.0 (2019/05/02)
 - replace `request` module with `got`
 - changed proxy cli options

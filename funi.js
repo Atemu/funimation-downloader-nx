@@ -489,8 +489,13 @@ async function downloadStreams(){
             plQualityAlt[pl_layer] = [];
         }
         if(dl_domain.match(/.cloudfront.net$/)){
-            plQualityStr.push(`${pl_layer}: ${pl_quality} (${pl_BANDWIDTH}KiB/s)`);
-            plQuality[pl_layer] = { "q": pl_quality, "url": pl_url };
+            if(plQuality[pl_layer] == undefined){
+                plQualityStr.push(`${pl_layer}: ${pl_quality} (${pl_BANDWIDTH}KiB/s)`);
+                plQuality[pl_layer] = { "q": pl_quality, "url": pl_url };
+            }
+            else if(plQuality[pl_layer] != undefined && plQuality[pl_layer].url != pl_url){
+                console.log(`[WARN] Non dublicate url for cloudfront.net detected, plese report to developer!`);
+            }
         }
         else{
             plQualityAlt[pl_layer].push({ "q": pl_quality, "url": pl_url });
