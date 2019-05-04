@@ -494,7 +494,7 @@ async function downloadStreams(){
                 plQuality[pl_layer] = { "q": pl_quality, "url": pl_url };
             }
             else if(plQuality[pl_layer] != undefined && plQuality[pl_layer].url != pl_url){
-                console.log(`[WARN] Non dublicate url for cloudfront.net detected, plese report to developer!`);
+                console.log(`[WARN] Non duplicate url for cloudfront.net detected, please report to developer!`);
             }
         }
         else{

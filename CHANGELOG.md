@@ -1,14 +1,14 @@
 ## Change Log
 
 ### 4.2.1 (2019/05/04)
-- filter dublicate urls for cloudfront.net
+- Filter duplicate urls for cloudfront.net (Closes #40)
 
 ### 4.2.0 (2019/05/02)
-- replace `request` module with `got`
-- changed proxy cli options
-- changed `login` option name to `auth`
-- changed `hls-download` parallel download configuration from 5 parts to 10
-- update modules
+- Replace `request` module with `got`
+- Changed proxy cli options
+- Changed `login` option name to `auth`
+- Changed `hls-download` parallel download configuration from 5 parts to 10
+- Update modules
 
 ### 4.1.0 (2019/04/05)
 - CLI options for login moved to CUI
