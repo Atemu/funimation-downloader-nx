@@ -1,5 +1,9 @@
 ## Change Log
 
+### 4.3.2 (2019/05/09)
+- Code improvements
+- Fix `hls-download` error printing
+
 ### 4.3.1 (2019/05/09)
 - Fix auto detection max quality (Regression in d7d280c)
 

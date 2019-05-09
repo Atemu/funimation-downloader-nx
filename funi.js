@@ -473,6 +473,11 @@ async function downloadStreams(){
     
     let plQualityLinkList = m3u8(plQualityReq.res.body);
     
+    let mainServersList = [
+        'd132fumi6di1wa.cloudfront.net',
+        'funiprod.akamaized.net'
+    ];
+    
     let plServerList = [],
         plStreams    = {},
         plLayersStr  = [],
@@ -495,7 +500,9 @@ async function downloadStreams(){
         if(plStreams[plServer][plLayerId] && plStreams[plServer][plLayerId] != plUrlDl){
             console.log(`[WARN] Non duplicate url for ${plServer} detected, please report to developer!`);
         }
-        plStreams[plServer][plLayerId] = plUrlDl;
+        else{
+            plStreams[plServer][plLayerId] = plUrlDl;
+        }
         // set plLayersStr
         let plResolution = `${s.attributes.RESOLUTION.height}p`;
         plLayersRes[plLayerId] = plResolution;
@@ -511,38 +518,27 @@ async function downloadStreams(){
         }
     }
     
-    plLayersStr.sort();
-    
-    let mainServersList = [
-        'd132fumi6di1wa.cloudfront.net',
-        'funiprod.akamaized.net'
-    ];
-    
-    let plMainServer   = '';
-    let selectedServer = '';
-    let vidUrl         = '';
-    
-    if(plServerList.includes(mainServersList[0])){
-        plMainServer = mainServersList[0];
-        plServerList.splice(plServerList.indexOf(mainServersList[0]),1)
-        plServerList.unshift(mainServersList[0])
-    }
-    else if(plServerList.includes(mainServersList[1])){
-        plMainServer = mainServersList[1];
-        plServerList.splice(plServerList.indexOf(mainServersList[1]),1)
-        plServerList.unshift(mainServersList[1])
+    for(let s of mainServersList){
+        if(plServerList.includes(s)){
+            plServerList.splice(plServerList.indexOf(s),1);
+            plServerList.unshift(s);
+            break;
+        }
     }
     
     argv.q = argv.q < 1 || argv.q > plMaxLayer ? plMaxLayer : argv.q;
-    selectedServer = plServerList[argv.x-1];
     
+    let plSelectedServer = plServerList[argv.x-1];
+    let plSelectedList   = plStreams[plSelectedServer];
+    let videoUrl = argv.x < plServerList.length+1 && plSelectedList[argv.q] ? plSelectedList[argv.q] : '';
+    
+    plLayersStr.sort();
     console.log(`[INFO] Servers available:\n\t${plServerList.join('\n\t')}`);
     console.log(`[INFO] Available qualities:\n\t${plLayersStr.join('\n\t')}`);
     
-    if(argv.x < plServerList.length+1 && plStreams[selectedServer][argv.q]){
-        console.log(`[INFO] Selected layer: ${argv.q} (${plLayersRes[argv.q]}) @ ${selectedServer}`);
-        vidUrl = plStreams[selectedServer][argv.q];
-        console.log(`[INFO] Stream URL:`,vidUrl);
+    if(videoUrl != ''){
+        console.log(`[INFO] Selected layer: ${argv.q} (${plLayersRes[argv.q]}) @ ${plSelectedServer}`);
+        console.log(`[INFO] Stream URL:`,videoUrl);
         fnSuffix = argv.suffix.replace('SIZEp',plLayersRes[argv.q]);
         fnOutput = shlp.cleanupFilename(`[${argv.a}] ${fnTitle} - ${fnEpNum} [${fnSuffix}]`);
         console.log(`[INFO] Output filename: ${fnOutput}`);
@@ -557,14 +553,14 @@ async function downloadStreams(){
     }
     
     // download video
-    let reqVid = await getData({
-        url: vidUrl,
+    let reqVideo = await getData({
+        url: videoUrl,
         useProxy: (argv.ssp ? false : true),
     });
-    if(!reqVid.ok){return;}
+    if(!reqVideo.ok){return;}
     
-    let chunkList = m3u8(reqVid.res.body);
-    chunkList.baseUrl = vidUrl.split('/').slice(0, -1).join('/')+'/';
+    let chunkList     = m3u8(reqVideo.res.body);
+    chunkList.baseUrl = videoUrl.split('/').slice(0, -1).join('/')+'/';
     
     let proxyHLS;
     if(argv.proxy && !argv.ssp){
@@ -581,7 +577,7 @@ async function downloadStreams(){
         proxy: (proxyHLS?proxyHLS:false)
     });
     if(!dldata.ok){
-        console.log(`[ERROR] ${dldata.err}\n`);
+        console.log(`[ERROR] ${dldata.error}\n`);
         return;
     }
     else{
