@@ -1,7 +1,10 @@
 ## Change Log
 
+### 4.3.1 (2019/05/09)
+- Fix auto detection max quality (Regression in d7d280c)
+
 ### 4.3.0 (2019/05/09)
-- Better server selection (Closes #42) 
+- Better server selection (Closes #42)
 
 ### 4.2.1 (2019/05/04)
 - Filter duplicate urls for cloudfront.net (Closes #40)

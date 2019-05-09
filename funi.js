@@ -533,6 +533,7 @@ async function downloadStreams(){
         plServerList.unshift(mainServersList[1])
     }
     
+    argv.q = argv.q < 1 || argv.q > plMaxLayer ? plMaxLayer : argv.q;
     selectedServer = plServerList[argv.x-1];
     
     console.log(`[INFO] Servers available:\n\t${plServerList.join('\n\t')}`);
