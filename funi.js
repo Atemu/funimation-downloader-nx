@@ -94,8 +94,8 @@ let argv = yargs
     .describe('simul','Forсe download simulcast version instead of uncut')
     .boolean('simul')
     
-    .describe('x','Select server (1 is cloudfront.net, 2...3 is dlvr1.net)')
-    .choices('x', [1, 2, 3])
+    .describe('x','Select server (1 is cloudfront.net/funiprod.akamaized.net, 2...3 is dlvr1.net, 4 is reserved)')
+    .choices('x', [1, 2, 3, 4])
     .default('x', cfg.cli.nServer)
     
     .describe('nosubs','Skip download subtitles for Dub (if available)')
@@ -470,58 +470,88 @@ async function downloadStreams(){
         useProxy: (argv.ssp ? false : true),
     });
     if(!plQualityReq.ok){return;}
+    
     let plQualityLinkList = m3u8(plQualityReq.res.body);
     
-    // build
-    let plQuality = {};
-    let plQualityAlt = {};
-    let plQualityStr = [];
-    let pl_max = 1;
+    let plServerList = [],
+        plStreams    = {},
+        plLayersStr  = [],
+        plLayersRes  = {};
+        plMaxLayer   = 1;
     
     for(let s of plQualityLinkList.playlists){
-        let pl_layer = parseInt(s.uri.match(/_Layer(\d+)\.m3u8$/)[1]);
-        pl_max = pl_max < pl_layer ? pl_layer : pl_max;
-        let pl_BANDWIDTH = Math.round(s.attributes.BANDWIDTH/1024);
-        let pl_quality = s.attributes.RESOLUTION.height+'p';
-        let pl_url = s.uri;
-        let dl_domain = pl_url.split('/')[2];
-        if(typeof plQualityAlt[pl_layer] == 'undefined'){
-            plQualityAlt[pl_layer] = [];
+        // set layer and max layer
+        let plLayerId = parseInt(s.uri.match(/_Layer(\d+)\.m3u8$/)[1]);
+        plMaxLayer    = plMaxLayer < plLayerId ? plLayerId : plMaxLayer;
+        // set urls and servers
+        let plUrlDl  = s.uri;
+        let plServer = plUrlDl.split('/')[2];
+        if(!plServerList.includes(plServer)){
+            plServerList.push(plServer);
         }
-        if(dl_domain.match(/.cloudfront.net$/)){
-            if(plQuality[pl_layer] == undefined){
-                plQualityStr.push(`${pl_layer}: ${pl_quality} (${pl_BANDWIDTH}KiB/s)`);
-                plQuality[pl_layer] = { "q": pl_quality, "url": pl_url };
-            }
-            else if(plQuality[pl_layer] != undefined && plQuality[pl_layer].url != pl_url){
-                console.log(`[WARN] Non duplicate url for cloudfront.net detected, please report to developer!`);
-            }
+        if(!Object.keys(plStreams).includes(plServer)){
+            plStreams[plServer] = {};
         }
-        else{
-            plQualityAlt[pl_layer].push({ "q": pl_quality, "url": pl_url });
+        if(plStreams[plServer][plLayerId] && plStreams[plServer][plLayerId] != plUrlDl){
+            console.log(`[WARN] Non duplicate url for ${plServer} detected, please report to developer!`);
+        }
+        plStreams[plServer][plLayerId] = plUrlDl;
+        // set plLayersStr
+        let plResolution = `${s.attributes.RESOLUTION.height}p`;
+        plLayersRes[plLayerId] = plResolution;
+        let plBandwidth  = Math.round(s.attributes.BANDWIDTH/1024);
+        if(plLayerId<10){
+            plLayerId = plLayerId.toString().padStart(2,' ')
+        }
+        let qualityStrAdd   = `${plLayerId}: ${plResolution} (${plBandwidth}KiB/s)`;
+        let qualityStrRegx  = new RegExp(qualityStrAdd.replace(/(\:|\(|\)|\/)/g,'\\$1'),'m');
+        let qualityStrMatch = !plLayersStr.join('\r\n').match(qualityStrRegx);
+        if(qualityStrMatch){
+            plLayersStr.push(qualityStrAdd);
         }
     }
     
-    // select quality and server
-    argv.x = argv.x - 1;
-    argv.q = argv.q < 1 || argv.q > pl_max ? pl_max : argv.q;
-    let maxServers = plQualityAlt[argv.q].length + 1;
-    if(argv.x > 0){
-        plQuality[argv.q] = argv.x > maxServers-1 ? plQualityAlt[argv.q][0] : plQualityAlt[argv.q][argv.x-1];
-    }
-    let vidUrl = plQuality[argv.q].url;
+    plLayersStr.sort();
     
-    if(plQuality[argv.q]){
-        console.log(`[INFO] Selected layer: ${argv.q}\n\tAvailable qualities:\n\t\t${plQualityStr.join('\n\t\t')}`);
-        fnSuffix = argv.suffix.replace('SIZEp',plQuality[argv.q].q);
-        console.log(`[INFO] Selected server: ` + ( argv.x < 1 ? `1` : ( argv.x > maxServers-1 ? maxServers : argv.x+1 ) ) + ` / Total servers available: ` + maxServers );
+    let mainServersList = [
+        'd132fumi6di1wa.cloudfront.net',
+        'funiprod.akamaized.net'
+    ];
+    
+    let plMainServer   = '';
+    let selectedServer = '';
+    let vidUrl         = '';
+    
+    if(plServerList.includes(mainServersList[0])){
+        plMainServer = mainServersList[0];
+        plServerList.splice(plServerList.indexOf(mainServersList[0]),1)
+        plServerList.unshift(mainServersList[0])
+    }
+    else if(plServerList.includes(mainServersList[1])){
+        plMainServer = mainServersList[1];
+        plServerList.splice(plServerList.indexOf(mainServersList[1]),1)
+        plServerList.unshift(mainServersList[1])
+    }
+    
+    selectedServer = plServerList[argv.x-1];
+    
+    console.log(`[INFO] Servers available:\n\t${plServerList.join('\n\t')}`);
+    console.log(`[INFO] Available qualities:\n\t${plLayersStr.join('\n\t')}`);
+    
+    if(argv.x < plServerList.length+1 && plStreams[selectedServer][argv.q]){
+        console.log(`[INFO] Selected layer: ${argv.q} (${plLayersRes[argv.q]}) @ ${selectedServer}`);
+        vidUrl = plStreams[selectedServer][argv.q];
         console.log(`[INFO] Stream URL:`,vidUrl);
+        fnSuffix = argv.suffix.replace('SIZEp',plLayersRes[argv.q]);
         fnOutput = shlp.cleanupFilename(`[${argv.a}] ${fnTitle} - ${fnEpNum} [${fnSuffix}]`);
         console.log(`[INFO] Output filename: ${fnOutput}`);
     }
+    else if(argv.x > plServerList.length){
+        console.log(`[ERROR] Server not selected!\n`);
+        return;
+    }
     else{
-        console.log(`[INFO] Available qualities:`,plQualityStr.join('\n\t'));
-        console.log(`[ERROR] Layer not selected\n`);
+        console.log(`[ERROR] Layer not selected!\n`);
         return;
     }
     

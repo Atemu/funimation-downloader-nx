@@ -43,7 +43,7 @@ After installing NodeJS with NPM go to directory with `package.json` file and ty
 * `--alt` alternative episode listing (if available)
 * `--sub` switch from English dub to Japanese dub with subtitles
 * `--simul` force select simulcast version instead of uncut version
-* `-x` select server (1 is cloudfront.net, 2...3 is dlvr1.net)
+* `-x` select server (1 is cloudfront.net/funiprod.akamaized.net, 2...3 is dlvr1.net, 4 is reserved)
 * `--nosubs` skip download subtitles for Dub (if available)
 
 ### Proxy
