@@ -94,7 +94,7 @@ let argv = yargs
     .describe('simul','Forсe download simulcast version instead of uncut')
     .boolean('simul')
     
-    .describe('x','Select server (1 is cloudfront.net/funiprod.akamaized.net, 2...3 is dlvr1.net, 4 is reserved)')
+    .describe('x','Select server')
     .choices('x', [1, 2, 3, 4])
     .default('x', cfg.cli.nServer)
     
