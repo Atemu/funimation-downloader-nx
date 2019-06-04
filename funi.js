@@ -98,11 +98,11 @@ let argv = yargs
     .choices('x', [1, 2, 3, 4])
     .default('x', cfg.cli.nServer)
     
+    .describe('novids', 'Skip download videos')
+    .boolean('novids')
+    
     .describe('nosubs','Skip download subtitles for Dub (if available)')
     .boolean('nosubs')
-
-    .describe('novids', 'Skip download videos and only download subtitles')
-    .boolean('novids')
     
     // proxy
     .describe('proxy','http(s)/socks proxy WHATWG url (ex. https://myproxyhost:1080/)')
@@ -588,6 +588,9 @@ async function downloadStreams(){
             console.log(`[INFO] Video downloaded!\n`);
         }
     }
+    else{
+        console.log(`[INFO] Skip video downloading...\n`);
+    }
     
     // download subtitles
     if(stDlPath){
@@ -606,6 +609,11 @@ async function downloadStreams(){
             console.log(`[ERROR] Failed to download subtitles!`);
             argv.mks = false;
         }
+    }
+    
+    if(!isFile(`${fnOutput}.ts`)){
+        console.log(`\n[INFO] TS file not found, skip muxing video...\n`);
+        return;
     }
     
     // add subs

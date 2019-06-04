@@ -1,5 +1,9 @@
 ## Change Log
 
+### 4.4.0 (2019/06/04)
+- Added `--novids` option (Thanks to @subdiox)
+- Update modules
+
 ### 4.3.2 (2019/05/09)
 - Code improvements
 - Fix `hls-download` error printing
