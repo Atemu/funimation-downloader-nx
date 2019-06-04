@@ -100,6 +100,9 @@ let argv = yargs
     
     .describe('nosubs','Skip download subtitles for Dub (if available)')
     .boolean('nosubs')
+
+    .describe('novids', 'Skip download videos and only download subtitles')
+    .boolean('novids')
     
     // proxy
     .describe('proxy','http(s)/socks proxy WHATWG url (ex. https://myproxyhost:1080/)')
@@ -552,36 +555,38 @@ async function downloadStreams(){
         return;
     }
     
-    // download video
-    let reqVideo = await getData({
-        url: videoUrl,
-        useProxy: (argv.ssp ? false : true),
-    });
-    if(!reqVideo.ok){return;}
-    
-    let chunkList     = m3u8(reqVideo.res.body);
-    chunkList.baseUrl = videoUrl.split('/').slice(0, -1).join('/')+'/';
-    
-    let proxyHLS;
-    if(argv.proxy && !argv.ssp){
-        try{
-            proxyHLS.url = buildProxyUrl(argv.proxy,argv['proxy-auth']);
+    if (!argv.novids) {
+        // download video
+        let reqVideo = await getData({
+            url: videoUrl,
+            useProxy: (argv.ssp ? false : true),
+        });
+        if (!reqVideo.ok) { return; }
+        
+        let chunkList = m3u8(reqVideo.res.body);
+        chunkList.baseUrl = videoUrl.split('/').slice(0, -1).join('/') + '/';
+        
+        let proxyHLS;
+        if (argv.proxy && !argv.ssp) {
+            try {
+                proxyHLS.url = buildProxyUrl(argv.proxy, argv['proxy-auth']);
+            }
+            catch (e) { }
         }
-        catch(e){}
-    }
-    let dldata = await streamdl({
-        fn: fnOutput,
-        m3u8json: chunkList,
-        baseurl: chunkList.baseUrl,
-        pcount: 10,
-        proxy: (proxyHLS?proxyHLS:false)
-    });
-    if(!dldata.ok){
-        console.log(`[ERROR] ${dldata.error}\n`);
-        return;
-    }
-    else{
-        console.log(`[INFO] Video downloaded!\n`);
+        let dldata = await streamdl({
+            fn: fnOutput,
+            m3u8json: chunkList,
+            baseurl: chunkList.baseUrl,
+            pcount: 10,
+            proxy: (proxyHLS ? proxyHLS : false)
+        });
+        if (!dldata.ok) {
+            console.log(`[ERROR] ${dldata.error}\n`);
+            return;
+        }
+        else {
+            console.log(`[INFO] Video downloaded!\n`);
+        }
     }
     
     // download subtitles
