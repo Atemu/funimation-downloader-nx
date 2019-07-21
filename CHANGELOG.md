@@ -1,5 +1,8 @@
 ## Change Log
 
+### 4.4.2 (2019/07/21)
+- Better proxy handling for stream download
+
 ### 4.4.1 (2019/07/21)
 - Fixed proxy for stream download
 
