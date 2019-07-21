@@ -566,12 +566,16 @@ async function downloadStreams(){
         let chunkList = m3u8(reqVideo.res.body);
         chunkList.baseUrl = videoUrl.split('/').slice(0, -1).join('/') + '/';
         
-        let proxyHLS;
+        let proxyHLS = {};
         if (argv.proxy && !argv.ssp) {
             try {
-                proxyHLS.url = buildProxyUrl(argv.proxy, argv['proxy-auth']);
+                proxyHLS.url = buildProxyUrl(argv.proxy,argv['proxy-auth']);
             }
-            catch (e) { }
+            catch(e){
+                console.log(`\n[WARN] Not valid proxy URL${e.input?' ('+e.input+')':''}!`);
+                console.log(`[WARN] Skiping...`);
+                proxyHLS = false;
+            }
         }
         let dldata = await streamdl({
             fn: fnOutput,
@@ -711,6 +715,7 @@ async function getData(options){
         catch(e){
             console.log(`\n[WARN] Not valid proxy URL${e.input?' ('+e.input+')':''}!`);
             console.log(`[WARN] Skiping...`);
+            argv.proxy = false;
         }
     }
     try {
